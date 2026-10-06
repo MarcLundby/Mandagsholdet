@@ -1064,10 +1064,10 @@ async function init(){
   if(S.user){ try{ S.canCoach=await S.user.canEdit(); S.canWrite=await S.user.can('data.write'); }catch(e){} }
   var me0=lsGet('tl-me'); if(me0) S.me=me0;
   if(!S.db){ render(); return; }
-  var onErr=function(e){ S.err='Kunne ikke hente data ('+(e&&e.code||'fejl')+').'; schedule(); };
+  var mkErr=function(w){ return function(e){ S.err='Kunne ikke hente data ('+(e&&e.code||'fejl')+') – '+w+(window.AUTH_ERR?'':'')+'.'; schedule(); }; };
   S.db.collection('athletes').onSnapshot(function(snap){
     var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); }); S.athletes=o; S.loaded.a=true; ensureMe(); schedule();
-  },onErr);
+  },mkErr('athletes'));
   var unsubW=null;
   function subWorkouts(){
     if(unsubW) unsubW();
@@ -1075,7 +1075,7 @@ async function init(){
     if(window.coachAuth && !S.canCoach) q=q.where('draft','==',false);
     unsubW=q.onSnapshot(function(snap){
       var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); }); S.workouts=o; S.loaded.w=true; autoDate(); schedule();
-    },onErr);
+    },mkErr('workouts, '+((window.coachAuth&&!S.canCoach)?'gæst':'coach')));
   }
   subWorkouts();
   if(window.coachAuth) window.coachAuth.onChange=function(isCoach){
@@ -1086,7 +1086,7 @@ async function init(){
   };
   S.db.collection('results').orderBy('date','desc').limit(400).onSnapshot(function(snap){
     var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); }); S.results=o; S.loaded.r=true; schedule();
-  },onErr);
+  },mkErr('results'));
   render();
 }
 init();
