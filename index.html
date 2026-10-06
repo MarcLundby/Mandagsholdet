@@ -176,7 +176,7 @@ details p,details li{font-size:13px;color:var(--mute)}
   var isCoach=false, readyRes, ok=false, ready=new Promise(function(r){readyRes=r;});
   function evalCoach(u){ return !!(u&&!u.isAnonymous&&u.email&&u.email.toLowerCase()===coachEmail); }
   auth.onAuthStateChanged(function(u){
-    if(!u){ auth.signInAnonymously().catch(function(){ readyRes(false); }); return; }
+    if(!u){ auth.signInAnonymously().catch(function(e){ window.AUTH_ERR=(e&&e.code?e.code:'')+(e&&e.message?' – '+e.message:''); readyRes(false); }); return; }
     var c=evalCoach(u), changed=(c!==isCoach); isCoach=c; ok=true; readyRes(true);
     if(changed&&window.coachAuth&&window.coachAuth.onChange) window.coachAuth.onChange(c);
   });
@@ -470,7 +470,7 @@ function notices(){
   var h='';
   if(S.noRuntime||!S.db){
     if(window.SETUP_MISSING) h+='<div class="notice warn"><h3>Databasen er ikke sat op endnu</h3><p class="muted">Udfyld filen firebase-config.js som beskrevet i guiden.</p></div>';
-    else if(window.coachAuth) h+='<div class="notice warn"><h3>Ingen forbindelse til databasen</h3><p class="muted">Tjek din internetforbindelse og prøv at åbne siden igen.</p></div>';
+    else if(window.coachAuth) h+='<div class="notice warn"><h3>Ingen forbindelse til databasen</h3><p class="muted">Tjek din internetforbindelse og prøv at åbne siden igen.</p>'+(window.AUTH_ERR?'<p class="muted" style="word-break:break-word"><b>Fejlkode:</b> '+String(window.AUTH_ERR).replace(/</g,'&lt;')+'</p>':'')+'</div>';
     else if(S.noRuntime) h+='<div class="notice warn"><h3>Åbn siden i Claude</h3><p class="muted">Siden kan kun gemme og dele data, når den er åbnet fra Claude og du er logget ind.</p></div>';
     else h+='<div class="notice warn"><h3>Ingen forbindelse til data</h3><p class="muted">Log ind i Claude for at se og gemme træning.</p></div>';
   }
