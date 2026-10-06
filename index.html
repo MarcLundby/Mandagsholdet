@@ -1,0 +1,1096 @@
+<!doctype html>
+<html lang="da">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Holdets Træningslog</title>
+<meta name="description" content="Dagens program, vægte og skalering til holdet.">
+<meta name="theme-color" content="#eff1ec" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#0f1311" media="(prefers-color-scheme: dark)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Træning">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=Barlow:wght@400;500;600&display=swap">
+<style>
+html{padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font-size:14px}[hidden]{display:none!important}img{max-width:100%}
+
+/* Layout: smalt enkeltspor (mobil først). Sticky top med navn og tabs, dagens program som blokke, samlet log nederst. Store tal i kondenseret skrift. */
+:root{
+  --bg:#eff1ec; --surface:#fafbf8; --ink:#141916; --mute:#5b665f; --line:#d8ddd4;
+  --accent:#1c4fe0; --accent-ink:#ffffff; --accent-soft:#e1e8fd; --chip:#e6eae2;
+  --good:#1b7f47; --warn:#9a6208; --bad:#b83225;
+  --display:'Barlow Condensed','Arial Narrow',Arial,sans-serif;
+  --body:'Barlow',system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1311; --surface:#171c19; --ink:#e7ece6; --mute:#8d998f; --line:#28302b;
+    --accent:#7da0ff; --accent-ink:#0b1220; --accent-soft:#1b2540; --chip:#212823;
+    --good:#4cc47f; --warn:#e0a53a; --bad:#ef7a6c; color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1311; --surface:#171c19; --ink:#e7ece6; --mute:#8d998f; --line:#28302b;
+  --accent:#7da0ff; --accent-ink:#0b1220; --accent-soft:#1b2540; --chip:#212823;
+  --good:#4cc47f; --warn:#e0a53a; --bad:#ef7a6c; color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--body);font-size:15px;line-height:1.45}
+.wrap{max-width:760px;margin:0 auto;padding-inline:16px}
+h1,h2,h3{font-family:var(--display);margin:0;font-weight:600;text-wrap:balance;letter-spacing:.01em}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--bg);border-bottom:1px solid var(--line)}
+.top .wrap{padding-block:10px 0}
+.bar{display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.brand{font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.06em;text-transform:uppercase}
+.who{display:flex;align-items:center;gap:8px;min-width:0}
+.who label{font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.08em}
+.who select{width:auto;min-width:130px;max-width:56vw}
+.tabs{display:flex;gap:0;margin-top:8px;overflow-x:auto}
+.tabs button{background:none;border:0;border-bottom:3px solid transparent;color:var(--mute);padding:10px 12px;font-family:var(--display);font-weight:600;font-size:18px;letter-spacing:.04em;text-transform:uppercase;white-space:nowrap}
+.tabs button[aria-current="page"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+main{padding-block:18px 96px;display:flex;flex-direction:column;gap:16px}
+input,select,textarea{font:inherit;font-size:16px;color:var(--ink);background:var(--surface);border:1px solid var(--line);border-radius:6px;padding:8px 10px;min-width:0;width:100%}
+textarea{resize:vertical;min-height:120px;line-height:1.4}
+label.f{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--mute);text-transform:uppercase;letter-spacing:.07em;min-width:0}
+label.f input,label.f select{text-transform:none;letter-spacing:0;color:var(--ink)}
+.btn{background:var(--accent);color:var(--accent-ink);border:1px solid var(--accent);border-radius:6px;padding:9px 16px;font-weight:600}
+.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+.btn.danger{background:transparent;color:var(--bad);border-color:var(--bad)}
+.btn:disabled{opacity:.5;cursor:default}
+.btn.sm{padding:6px 10px;font-size:13px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.grow{flex:1 1 160px;min-width:0}
+.muted{color:var(--mute)}
+.small{font-size:13px}
+
+.datebar{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.datebar input{width:auto}
+.datebar .icon{width:40px;height:40px;padding:0;font-size:22px;line-height:1}
+.dayname{font-family:var(--display);font-weight:600;font-size:30px;line-height:1.05;text-transform:capitalize}
+.wtitle{font-family:var(--display);font-weight:600;font-size:22px;color:var(--mute);margin-top:-6px}
+
+.notice{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:14px 16px}
+.notice.warn{border-color:var(--warn)}
+.notice h3{font-size:20px;margin-bottom:4px}
+.notice p{margin:4px 0 0}
+
+.block{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.bhead{padding:14px 16px 10px;display:flex;flex-direction:column;gap:2px}
+.tag{font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.12em;color:var(--accent)}
+.bhead h2{font-size:26px}
+.fmt{font-weight:500}
+.bnotes{padding:0 16px 10px;color:var(--mute)}
+.item{padding:12px 16px;border-top:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+.item.head{padding-block:8px;background:var(--chip);font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.1em;color:var(--mute)}
+.irow{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}
+.irow>div{min-width:0}
+.iname{font-weight:600;font-size:16px}
+.scheme{color:var(--mute)}
+.big{font-family:var(--display);font-weight:700;font-size:38px;line-height:1;color:var(--accent);white-space:nowrap;font-variant-numeric:tabular-nums}
+.big small{font-size:16px;font-weight:600;margin-left:3px}
+.you{display:flex;flex-direction:column;gap:2px;align-items:flex-end;text-align:right}
+.you .lvl{font-family:var(--display);font-weight:700;font-size:24px;line-height:1.05;color:var(--accent)}
+.hint{font-size:13px;color:var(--mute)}
+.chip{display:inline-block;background:var(--chip);border-radius:20px;padding:2px 10px;font-size:12px;font-weight:600;color:var(--ink)}
+.chip.good{color:var(--good)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)} .chip.acc{color:var(--accent)}
+.log{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;align-items:end}
+.log .wide{grid-column:span 2}
+.saved{font-size:13px;color:var(--good);font-weight:600}
+.blocklog{padding:12px 16px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--accent-soft) 40%,var(--surface));display:flex;flex-direction:column;gap:10px}
+
+.athcard{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:14px 16px;display:flex;flex-direction:column;gap:6px}
+.athcard h3{font-size:22px}
+.athcard ul{margin:0;padding-left:18px}
+.scroll{overflow-x:auto;background:var(--surface);border:1px solid var(--line);border-radius:10px}
+table{border-collapse:collapse;width:100%;font-variant-numeric:tabular-nums}
+th,td{padding:8px 12px;text-align:right;white-space:nowrap;border-bottom:1px solid var(--line)}
+th:first-child,td:first-child{text-align:left;position:sticky;left:0;background:var(--surface)}
+th{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute);font-weight:600}
+tr:last-child td{border-bottom:0}
+.sec{display:flex;flex-direction:column;gap:8px}
+.sec h2{font-size:24px}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px}
+.pick{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px}
+.pick button{background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:14px 10px;font-family:var(--display);font-weight:600;font-size:22px;color:var(--ink)}
+.pick button:hover{border-color:var(--accent)}
+
+.prow{display:grid;grid-template-columns:minmax(120px,1.4fr) 1fr 1fr;gap:8px;align-items:end}
+.prow .nm{font-weight:600;padding-bottom:9px}
+.prow .nm small{display:block;font-weight:400;color:var(--mute);font-size:12px}
+@media (max-width:520px){.prow{grid-template-columns:1fr 1fr}.prow .nm{grid-column:span 2;padding-bottom:0}}
+.skillrow{display:grid;grid-template-columns:minmax(110px,1.2fr) 2fr 1fr;gap:8px;align-items:end}
+@media (max-width:520px){.skillrow{grid-template-columns:1fr 1fr}.skillrow .nm{grid-column:span 2}}
+
+.radarbox{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:8px 12px 14px;display:flex;flex-direction:column;gap:6px;align-items:center}
+.radar{width:100%;max-width:440px;height:auto;display:block}
+.radar .rg{fill:none;stroke:var(--line);stroke-width:1}
+.radar .ra{fill:var(--accent);fill-opacity:.22;stroke:var(--accent);stroke-width:2;stroke-linejoin:round}
+.radar .rd{fill:var(--accent)}
+.radar .rt{fill:none;stroke:var(--mute);stroke-width:1.5;stroke-dasharray:4 3;stroke-linejoin:round}
+.legend{font-size:12px;color:var(--mute);display:flex;gap:14px;flex-wrap:wrap;justify-content:center}
+.legend i{display:inline-block;width:18px;height:0;border-top:2px solid var(--accent);vertical-align:middle;margin-right:5px}
+.legend i.d{border-top:2px dashed var(--mute)}
+.radar .rl{fill:var(--ink);font-family:var(--body);font-size:13px;font-weight:600}
+.radar .rs{fill:var(--accent);font-family:var(--display);font-size:16px;font-weight:700}
+.scores{width:100%;display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:6px 16px;margin:0;padding:0;list-style:none}
+.scores li{display:flex;justify-content:space-between;gap:8px;border-bottom:1px solid var(--line);padding:4px 0}
+.scores b{font-family:var(--display);font-size:18px}
+.wk{display:flex;flex-direction:column;gap:6px}
+.wk h3{font-size:20px;color:var(--mute)}
+.wrow{display:flex;gap:10px;align-items:center;justify-content:space-between;width:100%;text-align:left;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 14px;color:var(--ink)}
+.wrow:hover{border-color:var(--accent)}
+.wrow .t{font-weight:600}
+.wrow .d{font-size:13px;color:var(--mute);text-transform:capitalize}
+.wrow.cur{border-color:var(--accent)}
+.toast{position:fixed;left:50%;transform:translateX(-50%) translateY(20px);bottom:calc(20px + env(safe-area-inset-bottom,0px));background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:8px;font-weight:500;opacity:0;pointer-events:none;transition:opacity .2s,transform .2s;max-width:calc(100vw - 32px);z-index:10}
+.toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast.bad{background:var(--bad);color:#fff}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+details summary{cursor:pointer;font-weight:600}
+details p,details li{font-size:13px;color:var(--mute)}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="seed.js"></script>
+<script>
+(function(){
+  var cfg=window.FIREBASE_CONFIG, coachEmail=String(window.COACH_EMAIL||'').toLowerCase();
+  if(!cfg||!cfg.apiKey||/DIN_|INDSÆT|YOUR_/i.test(cfg.apiKey)){ window.SETUP_MISSING=true; window.claude={use:function(){return Promise.resolve(null);}}; return; }
+  firebase.initializeApp(cfg);
+  var auth=firebase.auth(), fs=firebase.firestore(), FV=firebase.firestore.FieldValue;
+  var isCoach=false, readyRes, ok=false, ready=new Promise(function(r){readyRes=r;});
+  function evalCoach(u){ return !!(u&&!u.isAnonymous&&u.email&&u.email.toLowerCase()===coachEmail); }
+  auth.onAuthStateChanged(function(u){
+    if(!u){ auth.signInAnonymously().catch(function(){ readyRes(false); }); return; }
+    var c=evalCoach(u), changed=(c!==isCoach); isCoach=c; ok=true; readyRes(true);
+    if(changed&&window.coachAuth&&window.coachAuth.onChange) window.coachAuth.onChange(c);
+  });
+  window.coachAuth={
+    onChange:null,
+    signIn:function(e,p){ return auth.signInWithEmailAndPassword(e,p).then(function(cr){ if(!evalCoach(cr.user)){ return auth.signOut().then(function(){ throw new Error('not-coach'); }); } }); },
+    signOut:function(){ return auth.signOut(); }
+  };
+  function snap(s){ return {id:s.id,exists:s.exists,data:function(){return s.data();},metadata:{}}; }
+  function qsnap(s){ return {docs:s.docs.map(snap),size:s.size,empty:s.empty,docChanges:function(){return [];}}; }
+  function flat(o,pre,out){
+    Object.keys(o).forEach(function(k){
+      var v=o[k], p=pre?pre+'.'+k:k;
+      if(v&&typeof v==='object'&&!Array.isArray(v)){
+        if(v.__delete__===true) out[p]=FV.delete(); else flat(v,p,out);
+      } else out[p]=v;
+    });
+    return out;
+  }
+  function wrapDoc(r){
+    return {id:r.id,path:r.path,
+      get:function(){return r.get().then(snap);},
+      set:function(d){return r.set(d);},
+      update:function(d){return r.update(flat(d,'',{}));},
+      delete:function(){return r.delete();},
+      onSnapshot:function(n,e){return r.onSnapshot(function(s){n(snap(s));},e);}};
+  }
+  function wrapQuery(q){
+    return {
+      where:function(f,o,v){return wrapQuery(q.where(f,o==='eq'?'==':o,v));},
+      orderBy:function(f,d){return wrapQuery(q.orderBy(f,d));},
+      limit:function(n){return wrapQuery(q.limit(n));},
+      get:function(){return q.get().then(qsnap);},
+      onSnapshot:function(n,e){return q.onSnapshot(function(s){n(qsnap(s));},e);}
+    };
+  }
+  var db={
+    doc:function(p){return wrapDoc(fs.doc(p));},
+    collection:function(p){
+      var c=fs.collection(p), w=wrapQuery(c);
+      w.doc=function(id){return wrapDoc(id?c.doc(id):c.doc());};
+      w.add=function(d){return c.add(d).then(wrapDoc);};
+      return w;
+    }
+  };
+  var user={
+    isOwner:function(){return ready.then(function(){return isCoach;});},
+    canEdit:function(){return ready.then(function(){return isCoach;});},
+    can:function(){return ready.then(function(){return true;});},
+    id:function(){return ready.then(function(){return auth.currentUser?auth.currentUser.uid:null;});}
+  };
+  window.claude={use:function(name){
+    if(name==='db') return ready.then(function(){return ok?db:null;});
+    if(name==='user') return Promise.resolve(user);
+    return Promise.resolve(null);
+  }};
+})();
+</script>
+<script>
+(function(){
+'use strict';
+
+/* Bevægelser med vægt. ref = vægt der giver 10 point i spindelvævet. */
+var LOADS = {
+  wpullup:{name:'Weighted pull-up',unit:'kg ekstra',step:2.5,ref:60},
+  dbbench:{name:'DB bench',unit:'kg pr. hånd',step:2.5,ref:50},
+  dbrow:{name:'DB row',unit:'kg pr. hånd',step:2.5,ref:55},
+  bulgarian:{name:'Bulgarian split squat',unit:'kg pr. hånd',step:2.5,ref:40},
+  sandbag:{name:'Sandbag',unit:'kg',step:5,ref:110},
+  farmer:{name:'Farmer carry',unit:'kg pr. hånd',step:2.5,ref:60},
+  dbpress:{name:'DB strict press',unit:'kg pr. hånd',step:2.5,ref:35},
+  dbincline:{name:'DB incline bench',unit:'kg pr. hånd',step:2.5,ref:45},
+  wdips:{name:'Weighted dips',unit:'kg ekstra',step:2.5,ref:50},
+  dblunge:{name:'DB lunge / step-up',unit:'kg pr. hånd',step:2.5,ref:35},
+  backSquat:{name:'Back squat',unit:'kg',step:2.5,ref:200,bar:1},
+  frontSquat:{name:'Front squat',unit:'kg',step:2.5,ref:170,bar:1},
+  ohSquat:{name:'Overhead squat',unit:'kg',step:2.5,ref:130,bar:1},
+  deadlift:{name:'Dødløft',unit:'kg',step:2.5,ref:250,bar:1},
+  strictPress:{name:'Strict press',unit:'kg',step:2.5,ref:100,bar:1},
+  pushPress:{name:'Push press',unit:'kg',step:2.5,ref:130,bar:1},
+  benchPress:{name:'Bænkpres',unit:'kg',step:2.5,ref:140,bar:1},
+  snatch:{name:'Snatch',unit:'kg',step:2.5,ref:130,bar:1},
+  clean:{name:'Clean',unit:'kg',step:2.5,ref:160,bar:1},
+  cleanJerk:{name:'Clean & jerk',unit:'kg',step:2.5,ref:150,bar:1}
+};
+var SKILLS = {
+  pullup:{name:'Pull-ups', ladder:['Ring rows','Pull-up med elastik','Strict pull-up','Kipping pull-up','Chest-to-bar']},
+  lsit:{name:'L-sit', ladder:['Tuck hold','One-leg L-sit','L-sit','L-sit til V-sit']},
+  hspu:{name:'Håndstandspush-ups', ladder:['Pike push-up på kasse','HSPU med abmat','Chest-to-wall HSPU','Strict HSPU','Deficit strict HSPU']},
+  ttb:{name:'Toes-to-bar', ladder:['Hanging knee raise','Knees-to-elbows','Strict toes-to-bar','Kipping toes-to-bar']},
+  rope:{name:'Rope climbs', ladder:['Rope pull fra gulv','Rope climb med ben','Rope climb','Legless rope climb']},
+  muscleup:{name:'Muscle-ups (BMU/RMU)', ladder:['Jumping MU-drill','Ring MU med elastik','Bar muscle-up','Ring muscle-up']},
+  dips:{name:'Ring dips', ladder:['Bænk-dips','Ring dip med elastik','Ring dip','Strict ring dip']},
+  pistol:{name:'Pistols', ladder:['Pistol til kasse','Pistol med støtte','Pistol','Pistol med vægt']},
+  hsw:{name:'Håndstandsgang', ladder:['Wall walk','Håndstand hold','Håndstandsgang 5 m','Håndstandsgang 15 m+']}
+};
+var TYPES = {strength:'Styrke', gym:'Gymnastik', metcon:'Kondi', warmup:'Opvarmning', other:'Andet'};
+var COMP = {full:'Alle reps',almost:'Næsten',fail:'Ikke gennemført'};
+var COMP_LONG = {full:'Alle reps gennemført',almost:'Næsten (mistede få reps)',fail:'Ikke gennemført'};
+/* Typer: l = vægt i forhold til ref, s = gymnastikniveau på stigen, v = max reps i ét stræk i forhold til ref */
+var VREF = {hspu:15,ttb:20,rope:8,muscleup:10,dips:15,pistol:10,hsw:10,pullup:25,lsit:40};
+var CATS = [
+  {key:'push',label:'Skub',desc:'Overkrop, skub',parts:[['s','hspu'],['s','dips'],['l','dbbench'],['l','dbincline'],['l','dbpress'],['l','wdips'],['l','strictPress'],['l','benchPress'],['l','pushPress']]},
+  {key:'pull',label:'Træk',desc:'Overkrop, træk',parts:[['l','wpullup'],['l','dbrow'],['s','pullup'],['s','rope'],['s','muscleup']]},
+  {key:'core',label:'Core',desc:'Core og balance',parts:[['s','ttb'],['s','lsit'],['s','hsw']]},
+  {key:'legs',label:'Ben',desc:'Benstyrke',parts:[['l','bulgarian'],['l','dblunge'],['l','backSquat'],['l','frontSquat'],['l','ohSquat'],['s','pistol']]},
+  {key:'hip',label:'Hofte & ryg',desc:'Hofte, ryg og løft fra gulv',parts:[['l','deadlift'],['l','sandbag'],['l','clean']]},
+  {key:'oly',label:'Olympisk',desc:'Olympiske løft',parts:[['l','snatch'],['l','cleanJerk'],['l','clean']]},
+  {key:'gym',label:'Gym niveau',desc:'Gymnastik, niveau på stigen',parts:[['s','hspu'],['s','ttb'],['s','pullup'],['s','rope'],['s','muscleup'],['s','dips'],['s','lsit'],['s','pistol'],['s','hsw']]},
+  {key:'vol',label:'Gym volumen',desc:'Gymnastik, reps (eller sekunder) i ét stræk',parts:[['v','hspu'],['v','ttb'],['v','pullup'],['v','rope'],['v','muscleup'],['v','dips'],['v','lsit'],['v','pistol'],['v','hsw']]},
+  {key:'carry',label:'Carry & greb',desc:'Carry og greb',parts:[['l','farmer'],['l','sandbag']]}
+];
+
+var S = {
+  db:null, user:null, sample:null, canCoach:false, canWrite:null, noRuntime:false,
+  athletes:{}, workouts:{}, results:{}, loaded:{a:false,w:false,r:false}, err:'',
+  me:null, date:today(), dateTouched:false, tab:'today', fields:{}, confirm:null,
+  coach:{status:'', msg:'', busy:false, warn:[]}, dirty:false
+};
+
+function $(s, r){ return (r||document).querySelector(s); }
+function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];}); }
+function today(){ return ymd(new Date()); }
+function ymd(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function parseDate(s){ var p=s.split('-'); return new Date(+p[0],+p[1]-1,+p[2]); }
+function shiftDate(s,n){ var d=parseDate(s); d.setDate(d.getDate()+n); return ymd(d); }
+function dayLabel(s){ return parseDate(s).toLocaleDateString('da-DK',{weekday:'long',day:'numeric',month:'long'}); }
+function shortLabel(s){ return parseDate(s).toLocaleDateString('da-DK',{weekday:'short',day:'numeric',month:'short'}); }
+function num(v){ if(v==null||v==='') return null; var n=parseFloat(String(v).replace(',','.')); return isFinite(n)?n:null; }
+function nf(n){ return (Math.round(n*10)/10).toString().replace('.',','); }
+function roundTo(x,step){ return Math.round(x/step)*step; }
+function val(id, dflt){ return Object.prototype.hasOwnProperty.call(S.fields,id) ? S.fields[id] : (dflt==null?'':dflt); }
+function dv(id){ var el=document.getElementById(id); return el?el.value:''; }
+function lsGet(k){ try{ return localStorage.getItem(k); }catch(e){ return null; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+function clean(o){ return JSON.parse(JSON.stringify(o)); }
+function toast(msg,bad){
+  var t=$('#toast'); t.textContent=msg; t.className='toast show'+(bad?' bad':'');
+  clearTimeout(toast.t); toast.t=setTimeout(function(){ t.className='toast'; },4200);
+}
+function errMsg(e){
+  if(e && e.code==='invalid_argument') return 'Du har ikke skriveadgang. Bed ejeren om Bidrager-adgang.';
+  if(e && e.code==='quota_exceeded') return 'Databasen er fuld.';
+  return 'Kunne ikke gemme. Prøv igen.';
+}
+var Q=Promise.resolve();
+function enqueue(fn){ var p=Q.then(fn); Q=p.catch(function(){}); return p; }
+
+function athleteList(){
+  return Object.keys(S.athletes).map(function(id){ return {id:id,a:S.athletes[id]}; })
+    .sort(function(x,y){ return (x.a.order||0)-(y.a.order||0) || String(x.a.name).localeCompare(String(y.a.name)); });
+}
+function resDoc(date,id){ return S.results[date+'_'+id]; }
+function myAth(){ return S.me ? S.athletes[S.me] : null; }
+function gw(a,k){ return a&&a.w&&a.w[k]!=null ? a.w[k] : null; }
+function gpr(a,k){ return a&&a.pr&&a.pr[k]!=null ? a.pr[k] : null; }
+function gsk(a,k){ return a&&a.skills&&a.skills[k] ? a.skills[k] : null; }
+function sortedWorkouts(){ return Object.keys(S.workouts).sort().map(function(d){ return S.workouts[d]; }); }
+
+/* ---------- Skalering og læring ---------- */
+function workWeight(a,k){ var w=gw(a,k); if(w!=null) return w; var d=LOADS[k]; return d&&d.bar ? gpr(a,k) : null; }
+function loadFor(ath,wo,it){
+  var key=it.move, def=LOADS[key], pct=num(it.pct)||100;
+  var w=workWeight(ath,key);
+  var plan = wo&&wo.plan&&wo.plan[key]&&S.me ? wo.plan[key][S.me] : null;
+  var load = w!=null ? Math.max(0,roundTo(w*pct/100,def.step)) : null;
+  return {w:w,load:load,plan:plan==null?null:plan,pct:pct};
+}
+function nextW(def,w0,n,L,pct,comp,rpe){
+  var r = rpe==null ? (comp==='full'?8:comp==='almost'?9.5:10) : rpe;
+  if(comp==='almost') r=Math.max(r,9.5);
+  if(comp==='fail') r=10;
+  var base=L/(pct/100);
+  var adj=Math.max(0.88,Math.min(1.12,1+0.03*(8-r)));
+  var e=base*adj;
+  if(comp==='fail') e*=0.95; else if(comp==='almost') e*=0.98;
+  var a = n<=0?0.85 : n===1?0.6 : n===2?0.45 : 0.3;
+  var nw = w0==null ? e : w0+a*(e-w0);
+  return Math.max(0,roundTo(nw,def.step));
+}
+function gymScale(it,ath){
+  var sk=SKILLS[it.skill], last=sk.ladder.length-1;
+  var st=gsk(ath,it.skill), rx=Number.isInteger(it.level)?Math.max(0,Math.min(last,it.level)):null;
+  var L=st&&Number.isInteger(st.level)?st.level:null;
+  if(L==null) return {level:rx!=null?rx:0,kind:'unknown',hint:'Jeg kender ikke dit niveau endnu. Log passet, så lærer jeg det.',rx:rx};
+  if(rx==null) rx=L;
+  var use=Math.min(L,rx), kind=L<rx?'down':(L>rx?'above':'rx'), hint='';
+  var reps=parseInt(it.reps,10)||0;
+  if(use===L && st.max && reps){
+    var cap=Math.max(1,Math.round(st.max*0.7));
+    if(cap<reps) hint='Del op i sæt af højst '+cap+' (70 % af din max på '+st.max+').';
+  }
+  if((st.streak||0)>=((st.n||0)<3?1:2) && L<last && L<=rx){
+    hint+=(hint?' ':'')+'Du har klaret de seneste pas let. Prøv '+sk.ladder[L+1]+' med få reps.';
+  }
+  return {level:use,kind:kind,hint:hint,rx:rx};
+}
+function nextSkill(st,used,comp,rpe,mx){
+  st=st||{};
+  var L=Number.isInteger(st.level)?st.level:null;
+  var out={level:L,max:st.max!=null?st.max:null,streak:st.streak||0,fails:st.fails||0,n:(st.n||0)+1};
+  var easy=comp==='full'&&rpe!=null&&rpe<=7, hard=comp==='fail'||(rpe!=null&&rpe>=9.5);
+  if(L==null){ out.level=used; if(mx) out.max=mx; out.streak=easy?1:0; out.fails=0; return out; }
+  if(used>L && comp==='full'){ out.level=used; out.streak=0; out.fails=0; out.max=mx||null; return out; }
+  if(used===L){
+    if(mx) out.max=mx;
+    if(easy){ out.streak++; out.fails=0; }
+    else if(comp==='fail'){ out.fails++; out.streak=0; if(out.fails>=2&&L>0){ out.level=L-1; out.fails=0; out.max=null; } }
+    else if(hard){ out.streak=0; }
+    else { out.fails=0; }
+  }
+  return out;
+}
+function lastMove(athId,key,beforeDate){
+  var docs=Object.keys(S.results).map(function(k){return S.results[k];})
+    .filter(function(r){return r.athleteId===athId && r.date<beforeDate && r.items && r.items['mv_'+key];})
+    .sort(function(a,b){return b.date.localeCompare(a.date);});
+  return docs.length?{date:docs[0].date,e:docs[0].items['mv_'+key]}:null;
+}
+function fmtEntry(e){
+  var rpe=e.rpe?' · RPE '+nf(e.rpe):'';
+  if(e.kind==='load') return e.name+': '+nf(e.load)+' '+(e.unit||'kg')+' · '+(COMP[e.comp]||'')+rpe;
+  if(e.kind==='skill') return e.name+': '+e.levelName+' · '+(COMP[e.comp]||'')+(e.max?' · max '+e.max:'')+rpe;
+  if(e.kind==='overall') return 'Samlet: '+(e.score||'–')+rpe+(e.note?' ('+e.note+')':'');
+  return '';
+}
+
+/* ---------- Scoring (spindelvæv) ---------- */
+function partScore(ath,t,key){
+  if(t==='l'){
+    var d=LOADS[key], v=Math.max(gpr(ath,key)||0,gw(ath,key)||0);
+    if(gpr(ath,key)==null&&gw(ath,key)==null) return null;
+    return Math.max(1,Math.min(10,1+9*Math.min(1,v/d.ref)));
+  }
+  var st=gsk(ath,key);
+  if(t==='v'){ if(!st||!st.max) return null; return Math.max(1,Math.min(10,1+9*Math.min(1,st.max/VREF[key]))); }
+  if(!st||!Number.isInteger(st.level)) return null;
+  var last=SKILLS[key].ladder.length-1;
+  return Math.max(1,Math.min(10,1+9*(st.level/last)));
+}
+function catScores(ath){
+  return CATS.map(function(c){
+    var vals=c.parts.map(function(p){return partScore(ath,p[0],p[1]);}).filter(function(x){return x!=null;});
+    return {key:c.key,label:c.label,score:vals.length?vals.reduce(function(a,b){return a+b;},0)/vals.length:null,n:vals.length};
+  });
+}
+function teamAvg(){
+  var list=athleteList(), sums={}, cnt={};
+  list.forEach(function(x){ catScores(x.a).forEach(function(c){ if(c.score!=null){ sums[c.key]=(sums[c.key]||0)+c.score; cnt[c.key]=(cnt[c.key]||0)+1; } }); });
+  var o={}; Object.keys(sums).forEach(function(k){ if(cnt[k]>=2) o[k]=sums[k]/cnt[k]; }); return o;
+}
+function radarSvg(cats,avg){
+  var cx=220,cy=170,R=105,n=cats.length;
+  function pt(i,r){ var a=-Math.PI/2+i*2*Math.PI/n; return [cx+r*Math.cos(a),cy+r*Math.sin(a)]; }
+  var s='<svg class="radar" viewBox="0 0 440 345" role="img" aria-label="Spindelvævsdiagram over styrker og svagheder">';
+  if(avg && Object.keys(avg).length) s+='<polygon class="rt" points="'+cats.map(function(c,i){return pt(i,R*(avg[c.key]||0)/10).map(function(x){return x.toFixed(1);}).join(',');}).join(' ')+'"/>';
+  [2,4,6,8,10].forEach(function(v){ s+='<polygon class="rg" points="'+cats.map(function(c,i){return pt(i,R*v/10).map(function(x){return x.toFixed(1);}).join(',');}).join(' ')+'"/>'; });
+  cats.forEach(function(c,i){ var p=pt(i,R); s+='<line class="rg" x1="'+cx+'" y1="'+cy+'" x2="'+p[0].toFixed(1)+'" y2="'+p[1].toFixed(1)+'"/>'; });
+  s+='<polygon class="ra" points="'+cats.map(function(c,i){return pt(i,R*(c.score||0)/10).map(function(x){return x.toFixed(1);}).join(',');}).join(' ')+'"/>';
+  cats.forEach(function(c,i){ if(c.score!=null){ var p=pt(i,R*c.score/10); s+='<circle class="rd" cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="3.5"/>'; } });
+  cats.forEach(function(c,i){
+    var a=-Math.PI/2+i*2*Math.PI/n, p=pt(i,R+20), co=Math.cos(a), si=Math.sin(a);
+    var anchor=co>0.3?'start':(co<-0.3?'end':'middle'), y=p[1]+(si<-0.5?-12:(si>0.5?6:-4));
+    s+='<text class="rl" x="'+p[0].toFixed(1)+'" y="'+y.toFixed(1)+'" text-anchor="'+anchor+'">'+esc(c.label)+'</text>'
+      +'<text class="rs" x="'+p[0].toFixed(1)+'" y="'+(y+16).toFixed(1)+'" text-anchor="'+anchor+'">'+(c.score!=null?nf(c.score):'–')+'</text>';
+  });
+  return s+'</svg>';
+}
+
+/* ---------- Rendering ---------- */
+function render(){
+  S.dirty=false;
+  $('#app').innerHTML = header()+'<div class="wrap"><main>'+body()+'</main></div>';
+}
+function schedule(){
+  var a=document.activeElement;
+  if(a && (a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT') && $('#app').contains(a)){ S.dirty=true; return; }
+  render();
+}
+function header(){
+  var list=athleteList();
+  var opts='<option value="">Vælg…</option>'+list.map(function(x){return '<option value="'+esc(x.id)+'"'+(x.id===S.me?' selected':'')+'>'+esc(x.a.name)+'</option>';}).join('');
+  var tabs=[['today','I dag'],['program','Program'],['team','Hold'],['profile','Profil']];
+  if(S.canCoach) tabs.push(['coach','Coach']);
+  else if(window.coachAuth) tabs.push(['login','Coach-login']);
+  return '<header class="top"><div class="wrap"><div class="bar"><div class="brand">Træningslog</div>'
+    +'<div class="who"><label for="who">Jeg er</label><select id="who">'+opts+'</select></div></div>'
+    +'<nav class="tabs" aria-label="Sider">'+tabs.map(function(t){return '<button data-act="tab" data-tab="'+t[0]+'"'+(S.tab===t[0]?' aria-current="page"':'')+'>'+t[1]+'</button>';}).join('')+'</nav></div></header>';
+}
+function notices(){
+  var h='';
+  if(S.noRuntime||!S.db){
+    if(window.SETUP_MISSING) h+='<div class="notice warn"><h3>Databasen er ikke sat op endnu</h3><p class="muted">Udfyld filen firebase-config.js som beskrevet i guiden.</p></div>';
+    else if(window.coachAuth) h+='<div class="notice warn"><h3>Ingen forbindelse til databasen</h3><p class="muted">Tjek din internetforbindelse og prøv at åbne siden igen.</p></div>';
+    else if(S.noRuntime) h+='<div class="notice warn"><h3>Åbn siden i Claude</h3><p class="muted">Siden kan kun gemme og dele data, når den er åbnet fra Claude og du er logget ind.</p></div>';
+    else h+='<div class="notice warn"><h3>Ingen forbindelse til data</h3><p class="muted">Log ind i Claude for at se og gemme træning.</p></div>';
+  }
+  else if(S.canWrite===false) h+='<div class="notice warn"><h3>Kun læseadgang</h3><p class="muted">Du kan se programmet, men ikke gemme resultater. Bed ejeren give dig adgang som Bidrager.</p></div>';
+  if(S.err) h+='<div class="notice warn"><p>'+esc(S.err)+'</p></div>';
+  return h;
+}
+function body(){
+  var h=notices();
+  if(S.tab==='program') return h+programTab();
+  if(S.tab==='team') return h+teamTab();
+  if(S.tab==='profile') return h+profileTab();
+  if(S.tab==='coach' && S.canCoach) return h+coachTab();
+  if(S.tab==='login' && window.coachAuth && !S.canCoach) return h+loginTab();
+  return h+todayTab();
+}
+function loginTab(){
+  return '<section class="sec"><h2>Coach-login</h2><p class="muted small">Kun coachen skal logge ind. Alle andre vælger bare deres navn øverst.</p>'
+    +'<label class="f">E-mail<input id="lg-email" type="email" autocomplete="username" value="'+esc(val('lg-email',''))+'"></label>'
+    +'<label class="f">Adgangskode<input id="lg-pw" type="password" autocomplete="current-password"></label>'
+    +(S.loginErr?'<p class="small" style="color:var(--bad)">'+esc(S.loginErr)+'</p>':'')
+    +'<div class="row"><button class="btn" data-act="do-login">Log ind</button></div></section>';
+}
+function dateBar(){
+  return '<div class="datebar"><button class="btn ghost icon" data-act="d-prev" aria-label="Forrige dag">‹</button>'
+    +'<input type="date" id="dsel" value="'+esc(S.date)+'" aria-label="Dato">'
+    +'<button class="btn ghost icon" data-act="d-next" aria-label="Næste dag">›</button>'
+    +'<button class="btn ghost sm" data-act="d-today">I dag</button></div>'
+    +'<div class="dayname">'+esc(dayLabel(S.date))+'</div>';
+}
+function visible(w){ return !!w && (!w.draft || S.canCoach); }
+function visibleDates(){ return Object.keys(S.workouts).filter(function(d){ return visible(S.workouts[d]); }).sort(); }
+function nextWorkoutDate(){
+  var t=today(), ds=visibleDates();
+  for(var i=0;i<ds.length;i++){ if(ds[i]>=t) return ds[i]; }
+  return null;
+}
+
+function todayTab(){
+  var h=dateBar();
+  var list=athleteList();
+  if(!S.loaded.a||!S.loaded.w) return h+'<p class="muted">Henter program…</p>';
+  if(!list.length){
+    return h+'<div class="notice"><h3>Ingen atleter endnu</h3><p class="muted">'+(S.canCoach?'Tilføj holdets navne under Coach.':'Coachen skal først tilføje holdets navne.')+'</p></div>';
+  }
+  if(!S.me || !S.athletes[S.me]){
+    h+='<div class="notice"><h3>Hvem er du?</h3><p class="muted">Vælg dit navn, så får du dine egne vægte og din egen skalering.</p></div>'
+      +'<div class="pick">'+list.map(function(x){return '<button data-act="pick" data-id="'+esc(x.id)+'">'+esc(x.a.name)+'</button>';}).join('')+'</div>';
+  }
+  var w=S.workouts[S.date];
+  if(!visible(w)) w=null;
+  if(!w){
+    var nx=nextWorkoutDate();
+    return h+'<div class="notice"><h3>Intet program denne dag</h3><p class="muted">'+(nx?'Næste træning er '+esc(dayLabel(nx))+'.':'Der er ikke lagt flere pas op.')+'</p>'
+      +(nx?'<p><button class="btn" data-act="goto" data-date="'+esc(nx)+'">Åbn næste træning</button></p>':'')+'</div>';
+  }
+  var ath=myAth();
+  if(w.draft) h+='<div class="notice warn"><p><b>Kladde.</b> Kun du kan se dette pas, indtil du frigiver blokken under Coach.</p></div>';
+  if(w.title) h+='<div class="wtitle">'+esc(w.title)+'</div>';
+  if(w.note) h+='<div class="notice"><p>'+esc(w.note).replace(/\n/g,'<br>')+'</p></div>';
+  if(ath && S.db && S.canWrite!==false) h+='<div><button class="btn ghost sm" data-act="to-log">Gå til log ↓</button></div>';
+  (w.blocks||[]).forEach(function(b){ h+=blockHtml(b,w,ath); });
+  h+=logPanel(w,ath);
+  return h;
+}
+function blockHtml(b,w,ath){
+  var h='<section class="block"><div class="bhead"><span class="tag">'+esc(TYPES[b.type]||'Andet')+'</span>'
+    +'<h2>'+esc(b.title||TYPES[b.type]||'')+'</h2>'+(b.format?'<div class="fmt">'+esc(b.format)+'</div>':'')+'</div>';
+  if(b.notes) h+='<div class="bnotes">'+esc(b.notes)+'</div>';
+  (b.items||[]).forEach(function(it){
+    if(it.type==='load') h+=loadItem(it,w,ath);
+    else if(it.type==='skill') h+=skillItem(it,ath);
+    else if(it.head) h+='<div class="item head">'+esc(it.text||'')+'</div>';
+    else h+='<div class="item"><div>'+esc(it.text||'')+'</div></div>';
+  });
+  return h+'</section>';
+}
+function loadItem(it,w,ath){
+  var def=LOADS[it.move]; if(!def) return '';
+  var sc=loadFor(ath,w,it);
+  var scheme=(it.reps!=null&&it.reps!==''?it.reps:'')+(sc.pct!==100?' · '+nf(sc.pct)+' % af din arbejdsvægt':'');
+  var right = sc.load!=null ? '<div class="big">'+(it.move==='wpullup'?'+':'')+nf(sc.load)+'<small>'+esc(def.unit)+'</small></div>'
+    : '<div class="hint" style="text-align:right">'+(ath?'Vælg selv en vægt.<br>Din første log sætter dit niveau.':'Vælg dit navn')+'</div>';
+  var h='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||def.name)+'</div><div class="scheme">'+esc(scheme)+'</div></div>'+right+'</div>';
+  if(it.note) h+='<div class="hint">'+esc(it.note)+'</div>';
+  if(ath){
+    var bits=[];
+    if(sc.plan!=null) bits.push('Plan i programmet: '+nf(sc.plan)+' '+def.unit+(sc.load!=null&&Math.abs(sc.plan-sc.load)>=def.step?' (din tilpassede vægt er '+nf(sc.load)+')':''));
+    var last=lastMove(S.me,it.move,S.date);
+    if(last) bits.push('Sidst '+shortLabel(last.date)+': '+nf(last.e.load)+' kg, '+(COMP[last.e.comp]||'').toLowerCase()+(last.e.rpe?', RPE '+nf(last.e.rpe):''));
+    var pr=gpr(ath,it.move); if(pr!=null) bits.push('PR: '+nf(pr)+' kg');
+    if(bits.length) h+='<div class="hint">'+esc(bits.join(' · '))+'</div>';
+  }
+  return h+'</div>';
+}
+function skillItem(it,ath){
+  var sk=SKILLS[it.skill]; if(!sk) return '';
+  var sc=gymScale(it,ath);
+  var rxName=sc.rx!=null?sk.ladder[sc.rx]:null;
+  var h='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||sk.name)+'</div><div class="scheme">'
+    +esc(it.reps!=null?String(it.reps):'')+(rxName?' · Rx: '+esc(rxName):'')+'</div></div>';
+  if(ath){
+    var chip=sc.kind==='down'?'<span class="chip warn">Skaleret</span>':sc.kind==='above'?'<span class="chip good">Du kan mere</span>':sc.kind==='rx'?'<span class="chip">Rx</span>':'';
+    h+='<div class="you">'+chip+'<div class="lvl">'+esc(sk.ladder[sc.level])+'</div></div>';
+  }
+  h+='</div>';
+  if(it.note) h+='<div class="hint">'+esc(it.note)+'</div>';
+  if(ath&&sc.hint) h+='<div class="hint">'+esc(sc.hint)+'</div>';
+  return h+'</div>';
+}
+
+/* Samlet log for dagens pas: én række pr. bevægelse */
+function moveRows(w){
+  var rows=[], seen={};
+  (w.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){
+    var id=null, type=null, key=null;
+    if(it.type==='load'&&LOADS[it.move]){ type='load'; key=it.move; }
+    else if(it.type==='skill'&&SKILLS[it.skill]){ type='skill'; key=it.skill; }
+    if(!key) return;
+    id=type+'_'+key;
+    if(seen[id]){ seen[id].labels.push(it.label||''); return; }
+    seen[id]={id:id,type:type,key:key,item:it,labels:[it.label||'']}; rows.push(seen[id]);
+  }); });
+  return rows;
+}
+function compSel(id,v){
+  return '<select id="'+id+'">'+Object.keys(COMP_LONG).map(function(k){return '<option value="'+k+'"'+(v===k?' selected':'')+'>'+esc(COMP_LONG[k])+'</option>';}).join('')+'</select>';
+}
+function rpeSel(id,v){
+  var o='<option value="">–</option>';
+  for(var r=5;r<=10;r+=0.5){ o+='<option value="'+r+'"'+(String(v)===String(r)?' selected':'')+'>'+nf(r)+'</option>'; }
+  return '<select id="'+id+'">'+o+'</select>';
+}
+function logPanel(w,ath){
+  if(!ath||!S.db||S.canWrite===false) return '';
+  var rows=moveRows(w), d=resDoc(S.date,S.me), items=(d&&d.items)||{};
+  var h='<section class="block" id="logpanel"><div class="bhead"><span class="tag">Log</span><h2>Hvordan gik det?</h2>'
+    +'<div class="fmt muted">Udfyld det du lavede. Det er især de første logs, der lærer mig dit niveau. RPE er hvor hårdt det føltes fra 5 til 10.</div></div>';
+  rows.forEach(function(r){
+    var e=items['mv_'+r.key]||{}, id='lg-'+r.id+'-';
+    if(r.type==='load'){
+      var def=LOADS[r.key], sc=loadFor(ath,w,r.item);
+      var dflt = e.load!=null ? nf(e.load) : (sc.load!=null?nf(sc.load):(sc.plan!=null?nf(sc.plan):''));
+      h+='<div class="item"><div class="irow"><div class="iname">'+esc(def.name)+'</div><div class="hint">'+esc(def.unit)+'</div></div><div class="log">'
+        +'<label class="f">Vægt<input id="'+id+'w" inputmode="decimal" value="'+esc(val(id+'w',dflt))+'"></label>'
+        +'<label class="f wide">Gennemført'+compSel(id+'c',val(id+'c',e.comp||'full'))+'</label>'
+        +'<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e.rpe!=null?e.rpe:''))+'</label></div></div>';
+    } else {
+      var sk=SKILLS[r.key], sc2=gymScale(r.item,ath), cur=val(id+'l',e.level!=null?e.level:sc2.level);
+      var lv=sk.ladder.map(function(n,i){ return '<option value="'+i+'"'+(String(cur)===String(i)?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
+      h+='<div class="item"><div class="irow"><div class="iname">'+esc(sk.name)+'</div><div class="hint">'+esc(r.labels.filter(Boolean).join(', '))+'</div></div><div class="log">'
+        +'<label class="f wide">Variant du brugte<select id="'+id+'l">'+lv+'</select></label>'
+        +'<label class="f wide">Gennemført'+compSel(id+'c',val(id+'c',e.comp||'full'))+'</label>'
+        +'<label class="f">Max i ét stræk<input id="'+id+'m" inputmode="numeric" placeholder="valgfri" value="'+esc(val(id+'m',e.max!=null?e.max:''))+'"></label>'
+        +'<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e.rpe!=null?e.rpe:''))+'</label></div></div>';
+    }
+  });
+  var o=items.overall||{};
+  h+='<div class="blocklog"><div class="log">'
+    +'<label class="f wide">Samlet resultat (tid, runder eller reps)<input id="lg-o-score" value="'+esc(val('lg-o-score',o.score||''))+'"></label>'
+    +'<label class="f">Samlet RPE'+rpeSel('lg-o-rpe',val('lg-o-rpe',o.rpe!=null?o.rpe:''))+'</label>'
+    +'<label class="f wide">Note (valgfri)<input id="lg-o-note" placeholder="fx skulder mod slut" value="'+esc(val('lg-o-note',o.note||''))+'"></label></div>'
+    +'<div class="row"><button class="btn" data-act="save-log">Gem log</button></div>'
+    +'<div class="hint">Gemmer du igen, rettes loggen, men din arbejdsvægt og dit niveau justeres kun første gang.</div>'
+    +(Object.keys(items).length?'<div class="saved">Gemt: '+esc(Object.keys(items).filter(function(k){return k!=='overall';}).map(function(k){return fmtEntry(items[k]);}).join(' | '))+'</div>':'')
+    +'</div></section>';
+  return h;
+}
+
+function programTab(){
+  if(!S.loaded.w) return '<p class="muted">Henter program…</p>';
+  var ws=sortedWorkouts().filter(visible);
+  if(!ws.length) return '<div class="notice"><h3>Intet program endnu</h3><p class="muted">Coachen lægger programmet op.</p></div>';
+  var h='<p class="muted small">Tryk på et pas for at se dine vægte og din skalering.</p>', cur=null, t=today();
+  ws.forEach(function(w){
+    var wk=w.week||0, bl=w.block||1, key=bl+'-'+wk;
+    if(key!==cur){ if(cur!==null) h+='</div>'; cur=key; h+='<div class="wk"><h3>Blok '+bl+(wk?' · Uge '+wk:'')+'</h3>'; }
+    var done=S.me&&resDoc(w.date,S.me);
+    h+='<button class="wrow'+(w.date===S.date?' cur':'')+'" data-act="goto" data-date="'+esc(w.date)+'"><span><span class="t">'+esc((w.title||'').replace(/^Uge \d+\s*·\s*/,''))+'</span><br><span class="d">'+esc(shortLabel(w.date))+'</span></span>'
+      +'<span>'+(w.draft?'<span class="chip warn">Kladde</span> ':'')+(w.date===t?'<span class="chip acc">I dag</span> ':'')+(done?'<span class="chip good">Logget</span>':'')+'</span></button>';
+  });
+  return h+'</div>';
+}
+
+function teamTab(){
+  var h=dateBar();
+  if(!S.loaded.a) return h+'<p class="muted">Henter hold…</p>';
+  var list=athleteList();
+  if(!list.length) return h+'<div class="notice"><p class="muted">Ingen atleter endnu.</p></div>';
+  h+='<section class="sec"><h2>Dagens resultater</h2><div style="display:flex;flex-direction:column;gap:10px">';
+  list.forEach(function(x){
+    var d=resDoc(S.date,x.id), items=d&&d.items?Object.keys(d.items).sort().map(function(k){return d.items[k];}):[];
+    h+='<div class="athcard"><h3>'+esc(x.a.name)+'</h3>'+(items.length?'<ul>'+items.map(function(e){return '<li>'+esc(fmtEntry(e))+'</li>';}).join('')+'</ul>':'<span class="muted">Intet logget endnu</span>')+'</div>';
+  });
+  h+='</div></section>';
+  var keys=Object.keys(LOADS);
+  function tbl(title,getter,note){
+    var use=keys.filter(function(k){return list.some(function(x){return getter(x.a,k)!=null;});});
+    if(!use.length) return '';
+    return '<section class="sec"><h2>'+title+'</h2>'+(note?'<p class="muted small">'+note+'</p>':'')+'<div class="scroll"><table><thead><tr><th>Navn</th>'+use.map(function(k){return '<th>'+esc(LOADS[k].name)+'</th>';}).join('')+'</tr></thead><tbody>'
+      +list.map(function(x){ return '<tr><td>'+esc(x.a.name)+'</td>'+use.map(function(k){var v=getter(x.a,k);return '<td>'+(v!=null?nf(v):'–')+'</td>';}).join('')+'</tr>'; }).join('')
+      +'</tbody></table></div></section>';
+  }
+  h+=tbl('Arbejdsvægte (kg)',workWeight,'Den vægt, programmet regner med lige nu.');
+  h+=tbl('PR (kg)',gpr,'Tungeste gennemførte vægt.');
+  return h;
+}
+
+function profileTab(){
+  var a=myAth();
+  if(!S.loaded.a) return '<p class="muted">Henter profil…</p>';
+  if(!a) return '<div class="notice"><h3>Vælg dit navn</h3><p class="muted">Brug feltet "Jeg er" øverst, så kan du se din profil.</p></div>';
+  var cats=catScores(a), have=cats.filter(function(c){return c.score!=null;});
+  var h='<h2 style="font-size:28px">'+esc(a.name)+'</h2>';
+  var avg=teamAvg();
+  h+='<section class="sec"><h2>Styrker og svagheder</h2><div class="radarbox">'+radarSvg(cats,avg)
+    +'<div class="legend"><span><i></i>Dig</span>'+(Object.keys(avg).length?'<span><i class="d"></i>Holdets snit</span>':'')+'</div>';
+  if(have.length>=2){
+    var srt=have.slice().sort(function(x,y){return y.score-x.score;});
+    h+='<div class="small" style="text-align:center">Stærkest: <b>'+esc(srt[0].label)+'</b> ('+nf(srt[0].score)+') · Svagest: <b>'+esc(srt[srt.length-1].label)+'</b> ('+nf(srt[srt.length-1].score)+')</div>';
+  } else h+='<div class="small muted" style="text-align:center">Udfyld PR og gymnastikniveauer nedenfor, eller log et par pas, så fyldes diagrammet ud.</div>';
+  h+='<ul class="scores">'+cats.map(function(c){return '<li><span>'+esc(c.label)+'</span><b>'+(c.score!=null?nf(c.score):'–')+'</b></li>';}).join('')+'</ul></div>'
+    +'<details><summary>Sådan regnes scoren</summary><p>Hver akse er et gennemsnit af de bevægelser, du har tal for. Vægte tæller din tungeste af PR og arbejdsvægt i forhold til en 10-point-grænse. Gymnastikniveau tæller placeringen på stigen. Gym volumen tæller max reps i ét stræk i forhold til en 10-point-grænse. Akser uden tal vises med –.</p><ul>'
+    +CATS.map(function(c){return '<li><b>'+esc(c.label)+'</b> ('+esc(c.desc)+'): '+c.parts.map(function(p){return p[0]==='l'?LOADS[p[1]].name+' ('+LOADS[p[1]].ref+' kg)':p[0]==='v'?SKILLS[p[1]].name+' ('+VREF[p[1]]+' reps)':SKILLS[p[1]].name;}).join(', ')+'</li>';}).join('')+'</ul></details></section>';
+
+  h+='<section class="sec"><h2>PR og arbejdsvægte</h2><p class="muted small">PR er din tungeste gennemførte vægt og hæves automatisk, når du logger tungere. Arbejdsvægten er den, programmet regner ud fra, og den justeres efter hver log. Du kan rette begge når som helst.</p>';
+  Object.keys(LOADS).forEach(function(k){
+    var d=LOADS[k], pr=gpr(a,k), w=gw(a,k), dt=a.prd&&a.prd[k];
+    h+='<div class="prow"><div class="nm">'+esc(d.name)+'<small>'+esc(d.unit)+(dt?' · PR sat '+esc(dt.split('-').reverse().join('/')):'')+'</small></div>'
+      +'<label class="f">PR<input id="p-pr-'+k+'" inputmode="decimal" value="'+esc(val('p-pr-'+k,pr!=null?nf(pr):''))+'"></label>'
+      +'<label class="f">Arbejdsvægt<input id="p-w-'+k+'" inputmode="decimal" value="'+esc(val('p-w-'+k,w!=null?nf(w):''))+'"></label></div>';
+  });
+  h+='</section><section class="sec"><h2>Gymnastik</h2><p class="muted small">Vælg den sværeste variant du kan lave i arbejdssæt, og hvor mange du kan i ét stræk. Det justeres også automatisk, når du logger.</p><div style="display:flex;flex-direction:column;gap:10px">';
+  Object.keys(SKILLS).forEach(function(k){
+    var sk=SKILLS[k], st=gsk(a,k)||{};
+    var opts='<option value="">Ikke sat</option>'+sk.ladder.map(function(n,i){ var sel=String(val('p-lvl-'+k, st.level!=null?st.level:''))===String(i); return '<option value="'+i+'"'+(sel?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
+    h+='<div class="skillrow"><div class="nm iname">'+esc(sk.name)+'</div><label class="f">Niveau<select id="p-lvl-'+k+'">'+opts+'</select></label>'
+      +'<label class="f">Max i ét stræk<input id="p-sm-'+k+'" inputmode="numeric" value="'+esc(val('p-sm-'+k, st.max!=null?st.max:''))+'"></label></div>';
+  });
+  h+='</div></section><div class="row"><button class="btn" data-act="save-profile"'+(S.canWrite===false?' disabled':'')+'>Gem profil</button></div>';
+  return h;
+}
+
+/* ---------- Coach ---------- */
+var TEMPLATE={title:'Uge 1 · Skabelon',week:1,note:'20 min cap',plan:{},blocks:[
+  {title:'Gymnastik',type:'gym',format:'3 runder',notes:'',items:[
+    {type:'skill',skill:'hspu',label:'8 strict HSPU',reps:'8',level:3},
+    {type:'load',move:'wpullup',label:'5 weighted pull-ups',reps:'5',pct:100},
+    {type:'other',text:'200 m løb'}]}
+]};
+function coachTab(){
+  var c=S.coach, w=S.workouts[S.date];
+  var h=dateBar();
+  h+='<section class="sec"><h2>Dagens program</h2>'
+    +(w?'<p class="muted small">Der ligger et program på denne dato ('+(w.blocks||[]).length+' blokke). Gem et nyt for at erstatte det, eller hent det ind i editoren for at rette.</p>':'<p class="muted small">Indsæt programmet fra din programlægger. Claude laver det om til blokke, og du kan rette, før du gemmer.</p>')
+    +'<label class="f">Programtekst<textarea id="c-raw" placeholder="Indsæt dagens program her">'+esc(val('c-raw',''))+'</textarea></label>'
+    +'<div class="row"><button class="btn" data-act="parse"'+(S.sample&&!c.busy?'':' disabled')+'>'+(c.busy?'Claude arbejder…':'Lad Claude strukturere')+'</button>'
+    +'<button class="btn ghost" data-act="template">Brug skabelon</button>'+(w?'<button class="btn ghost" data-act="load-day">Hent dagens program</button>':'')+'</div>'
+    +(S.sample?'':'<p class="hint">Claude er ikke tilgængelig her. Brug skabelonen og ret i den.</p>')
+    +(c.msg?'<p class="small">'+esc(c.msg)+'</p>':'')
+    +(c.warn.length?'<ul class="small muted">'+c.warn.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>':'')
+    +'<label class="f">Struktureret program (kan rettes)<textarea id="c-json" style="min-height:240px;font-family:ui-monospace,Menlo,monospace;font-size:13px">'+esc(val('c-json',''))+'</textarea></label>'
+    +'<div class="row"><button class="btn" data-act="save-program">Gem program til '+esc(S.date)+'</button>'
+    +(w?'<button class="btn danger" data-act="del-program">Slet dagens program</button>':'')+'</div></section>';
+
+  var drafts=Object.keys(S.workouts).filter(function(d){return S.workouts[d].draft;}).sort();
+  h+='<section class="sec"><h2>Næste blok</h2>'
+    +(drafts.length?'<p class="muted small">'+drafts.length+' kladder fra '+esc(shortLabel(drafts[0]))+' til '+esc(shortLabel(drafts[drafts.length-1]))+'. Kun du kan se dem. Åbn et pas under Program for at se det, og ret det i editoren ovenfor.</p>'
+      +'<div class="row">'+(S.confirm==='release'?'<button class="btn" data-act="release">Ja, frigiv til alle</button><button class="btn ghost" data-act="rm-cancel">Fortryd</button>':'<button class="btn" data-act="release-ask">Frigiv blok til holdet</button>')
+      +(S.confirm==='drop'?'<button class="btn danger" data-act="drop-drafts">Ja, slet kladder</button>':'<button class="btn danger" data-act="drop-ask">Slet kladder</button>')+'</div>'
+      :'<p class="muted small">Ingen kladder lige nu.</p>')
+    +'<label class="f">Flyt dagens pas til en anden dato<input type="date" id="c-move" value="'+esc(val('c-move',''))+'"></label>'
+    +'<div class="row"><button class="btn ghost" data-act="move-day"'+(w?'':' disabled')+'>Flyt pas</button></div></section>';
+  if(window.SEED){
+    var sc=Object.keys(window.SEED.athletes||{}).length+Object.keys(window.SEED.workouts||{}).length+Object.keys(window.SEED.results||{}).length;
+    h+='<section class="sec"><h2>Startdata</h2><p class="muted small">Lægger de 5 atleter, 20 + 20 pas og første logs ind fra den gamle version ('+sc+' dokumenter). Gør det kun én gang, ellers overskrives nyere data.</p>'
+      +'<div class="row">'+(S.confirm==='seed'?'<button class="btn" data-act="import-seed">Ja, importér nu</button><button class="btn ghost" data-act="rm-cancel">Fortryd</button>':'<button class="btn ghost" data-act="seed-ask">Importér startdata</button>')+'</div></section>';
+  }
+  if(window.coachAuth) h+='<div class="row"><button class="btn ghost" data-act="do-logout">Log ud som coach</button></div>';
+  h+='<section class="sec"><h2>Atleter</h2><div style="display:flex;flex-direction:column;gap:8px">';
+  athleteList().forEach(function(x){
+    h+='<div class="row"><div class="grow iname">'+esc(x.a.name)+'</div>'
+      +(S.confirm===x.id?'<button class="btn danger sm" data-act="rm-athlete" data-id="'+esc(x.id)+'">Slet nu</button><button class="btn ghost sm" data-act="rm-cancel">Fortryd</button>'
+        :'<button class="btn ghost sm" data-act="rm-ask" data-id="'+esc(x.id)+'">Fjern</button>')+'</div>';
+  });
+  h+='</div><div class="row"><label class="f grow">Nyt navn<input id="c-newname" value="'+esc(val('c-newname',''))+'"></label><button class="btn" data-act="add-athlete" style="align-self:flex-end">Tilføj</button></div></section>';
+
+  h+='<section class="sec"><h2>Status til programlæggeren</h2><p class="muted small">Samler PR, arbejdsvægte, gymnastikniveauer, scores og de seneste resultater i én tekst, du kan indsætte i din programlægger.</p>'
+    +'<div class="row"><button class="btn" data-act="make-status">Lav statustekst</button>'+(c.status?'<button class="btn ghost" data-act="copy-status">Kopiér</button>':'')+'</div>'
+    +(c.status?'<label class="f">Statustekst<textarea id="c-status" style="min-height:260px;font-size:13px" readonly>'+esc(c.status)+'</textarea></label>':'')+'</section>';
+  return h;
+}
+function buildStatus(){
+  var out=['HOLDSTATUS '+today(),''];
+  var dates={};
+  Object.keys(S.results).forEach(function(k){ dates[S.results[k].date]=1; });
+  var recent=Object.keys(dates).sort().reverse().slice(0,4);
+  athleteList().forEach(function(x){
+    var a=x.a; out.push('## '+a.name);
+    var pr=Object.keys(LOADS).filter(function(k){return gpr(a,k)!=null;}).map(function(k){return LOADS[k].name+' '+nf(gpr(a,k));});
+    out.push('PR (kg): '+(pr.length?pr.join(', '):'ikke angivet'));
+    var w=Object.keys(LOADS).filter(function(k){return gw(a,k)!=null;}).map(function(k){return LOADS[k].name+' '+nf(gw(a,k))+' ('+(a.n&&a.n[k]||0)+' logs)';});
+    out.push('Arbejdsvægt nu: '+(w.length?w.join(', '):'ikke angivet'));
+    var g=Object.keys(SKILLS).filter(function(k){var s=gsk(a,k);return s&&Number.isInteger(s.level);}).map(function(k){var s=gsk(a,k);return SKILLS[k].name+': '+SKILLS[k].ladder[s.level]+(s.max?' (max '+s.max+')':'');});
+    out.push('Gymnastik: '+(g.length?g.join('; '):'ikke angivet'));
+    out.push('Score 1-10: '+catScores(a).map(function(c){return c.label+' '+(c.score!=null?nf(c.score):'–');}).join(', '));
+    recent.forEach(function(d){
+      var r=resDoc(d,x.id); if(!r||!r.items) return;
+      out.push('Resultater '+d+':');
+      Object.keys(r.items).sort().forEach(function(k){ out.push('- '+fmtEntry(r.items[k])); });
+    });
+    out.push('');
+  });
+  return out.join('\n');
+}
+function buildPrompt(raw){
+  var loads=Object.keys(LOADS).filter(function(k){return !LOADS[k].bar;}).map(function(k){return k+' = '+LOADS[k].name+' ('+LOADS[k].unit+')';}).join('\n');
+  var bars=Object.keys(LOADS).filter(function(k){return LOADS[k].bar;}).map(function(k){return k+' = '+LOADS[k].name;}).join(', ');
+  var skills=Object.keys(SKILLS).map(function(k){return k+' = '+SKILLS[k].name+': '+SKILLS[k].ladder.map(function(n,i){return i+':'+n;}).join(' | ');}).join('\n');
+  return 'Du omsætter et CrossFit-træningsprogram (dansk eller engelsk tekst) til JSON til en træningsapp.\n\n'
+   +'Svar KUN med ét JSON-objekt i dette format:\n'
+   +'{"title":string,"week":tal (valgfri),"note":string (valgfri, fx cap og generelle bemærkninger),"plan":{<bevægelsesnøgle>:{<atlet-id>:kg}} (valgfri),"blocks":[{"title":string,"type":"strength"|"gym"|"metcon"|"warmup"|"other","format":string (fx "3 runder", "EMOM 12 min"),"notes":string (valgfri),"items":[ITEM,...]}]}\n\n'
+   +'ITEM er en af:\n'
+   +'{"type":"load","move":<nøgle>,"label":string (fx "5 sandbag cleans"),"reps":string,"pct":tal (valgfri, procent af atletens arbejdsvægt, standard 100),"note":string (valgfri)}\n'
+   +'{"type":"skill","skill":<nøgle>,"label":string (fx "8 strict HSPU"),"reps":string,"level":<indeks for Rx-varianten>,"note":string (valgfri)}\n'
+   +'{"type":"other","text":string,"head":true hvis det kun er en overskrift som "Minut 1"}\n\n'
+   +'Vægtbevægelser:\n'+loads+'\nStangløft (kan bruges som load): '+bars+'\n\nGymnastik (nøgle = navn: indeks:variant, nemmest først):\n'+skills+'\n\n'
+   +'Regler:\n- Bevar rækkefølgen. Runder og format skrives i blokkens format. Items er det, der laves i hver runde.\n'
+   +'- Sandbag cleans, shouldering og reverse lunges bruger alle move "sandbag". Farmer carry bruger "farmer". Weighted pull-ups bruger "wpullup".\n'
+   +'- HSPU: strict = level 3, chest-to-wall = level 2, deficit = level 4. TTB = level 3. Rope climbs = level 2. BMU/RMU = level 2.\n'
+   +'- Står der faste vægte pr. person, læg dem i plan (nøgle = bevægelsen).\n'
+   +'- Bevægelser uden nøgle (løb, rower, wall balls osv.) bliver type other.\n- Opfind ikke noget, der ikke står i teksten.\n\nProgram:\n'+raw;
+}
+function normProgram(obj){
+  var warn=[];
+  if(!obj||!Array.isArray(obj.blocks)) return {err:'Programmet skal have en liste "blocks".'};
+  var blocks=obj.blocks.map(function(b,bi){
+    var type=TYPES[b&&b.type]?b.type:'other';
+    var items=(Array.isArray(b&&b.items)?b.items:[]).map(function(it,ii){
+      if(it&&it.type==='load'&&LOADS[it.move]) return {type:'load',move:it.move,label:String(it.label||''),reps:it.reps==null?'':String(it.reps),pct:num(it.pct)||100,note:String(it.note||'')};
+      if(it&&it.type==='skill'&&SKILLS[it.skill]){
+        var lv=parseInt(it.level,10), last=SKILLS[it.skill].ladder.length-1;
+        return {type:'skill',skill:it.skill,label:String(it.label||''),reps:it.reps==null?'':String(it.reps),level:isFinite(lv)?Math.max(0,Math.min(last,lv)):null,note:String(it.note||'')};
+      }
+      if(it&&(it.type==='load'||it.type==='skill')){ warn.push('Blok '+(bi+1)+', punkt '+(ii+1)+': ukendt bevægelse ('+(it.move||it.skill)+'). Gemmes som tekst.'); return {type:'other',text:String(it.label||it.move||it.skill||'')}; }
+      var o={type:'other',text:String((it&&it.text)||'')}; if(it&&it.head) o.head=true; return o;
+    });
+    return {title:String((b&&b.title)||''),type:type,format:String((b&&b.format)||''),notes:String((b&&b.notes)||''),items:items};
+  });
+  var prog={title:String(obj.title||''),note:String(obj.note||''),blocks:blocks};
+  if(obj.week!=null&&isFinite(parseInt(obj.week,10))) prog.week=parseInt(obj.week,10);
+  if(obj.block!=null&&isFinite(parseInt(obj.block,10))) prog.block=parseInt(obj.block,10);
+  if(typeof obj.day==='string') prog.day=obj.day;
+  if(typeof obj.draft==='boolean') prog.draft=obj.draft;
+  if(obj.plan&&typeof obj.plan==='object') prog.plan=obj.plan;
+  return {program:prog,warn:warn};
+}
+
+/* ---------- Gem log ---------- */
+function prune(o){
+  Object.keys(o).forEach(function(k){ if(o[k]&&typeof o[k]==='object'&&Object.keys(o[k]).length===0) delete o[k]; });
+  return o;
+}
+async function saveLog(){
+  var w=S.workouts[S.date], ath=myAth(); if(!w||!ath) return;
+  var rows=moveRows(w), existing=(resDoc(S.date,S.me)||{}).items||{};
+  var items={}, patch={w:{},n:{},pr:{},prd:{},skills:{}}, msgs=[], bad=null;
+  rows.forEach(function(r){
+    if(bad) return;
+    var id='lg-'+r.id+'-', comp=dv(id+'c')||'full', rpe=num(dv(id+'r')), first=!existing['mv_'+r.key];
+    if(r.type==='load'){
+      var raw=dv(id+'w').trim(); if(raw==='') return;
+      var L=num(raw); if(L==null||L<0){ bad='Vægten for '+LOADS[r.key].name+' skal være et tal.'; return; }
+      var def=LOADS[r.key], pct=num(r.item.pct)||100;
+      items['mv_'+r.key]={kind:'load',move:r.key,name:def.name,unit:def.unit,load:L,comp:comp,rpe:rpe,pct:pct,ts:Date.now()};
+      if(first){
+        var n=(ath.n&&ath.n[r.key])||0, w0=workWeight(ath,r.key);
+        var nw=nextW(def,w0,n,L,pct,comp,rpe);
+        patch.w[r.key]=nw; patch.n[r.key]=n+1;
+        items['mv_'+r.key].wAfter=nw;
+        if(w0!=null && nw!==w0) msgs.push(def.name+': arbejdsvægt '+nf(w0)+' → '+nf(nw));
+        else if(w0==null) msgs.push(def.name+': arbejdsvægt sat til '+nf(nw));
+        var pr=gpr(ath,r.key);
+        if(comp==='full' && L>0 && (!def.bar||pct>=100) && (pr==null||L>pr)){
+          patch.pr[r.key]=L; patch.prd[r.key]=S.date; items['mv_'+r.key].newPR=true;
+          msgs.push(pr==null?def.name+': PR sat til '+nf(L):'Ny PR i '+def.name+': '+nf(L));
+        }
+      }
+    } else {
+      var sk=SKILLS[r.key], lvl=parseInt(dv(id+'l'),10), mx=num(dv(id+'m'));
+      if(!isFinite(lvl)) return;
+      items['mv_'+r.key]={kind:'skill',skill:r.key,name:sk.name,level:lvl,levelName:sk.ladder[lvl],comp:comp,rpe:rpe,max:mx,ts:Date.now()};
+      if(first){
+        var old=gsk(ath,r.key), ns=nextSkill(old,lvl,comp,rpe,mx);
+        patch.skills[r.key]=ns;
+        if(!old||ns.level!==old.level) msgs.push(sk.name+': niveau '+sk.ladder[ns.level]);
+      }
+    }
+  });
+  if(bad){ toast(bad,true); return; }
+  var os=dv('lg-o-score').trim(), orpe=num(dv('lg-o-rpe')), on=dv('lg-o-note').trim();
+  if(os||orpe!=null||on) items.overall={kind:'overall',score:os,rpe:orpe,note:on,ts:Date.now()};
+  if(!Object.keys(items).length){ toast('Udfyld mindst én vægt eller et resultat.',true); return; }
+  try{
+    await writeResult(S.date,S.me,{items:items});
+    var p=prune(patch);
+    if(Object.keys(p).length) await enqueue(function(){ return S.db.doc('athletes/'+S.me).update(clean(p)); });
+    S.fields={};
+    toast(msgs.length?'Gemt. '+msgs.slice(0,3).join(' · '):'Gemt.');
+  }catch(e){ toast(errMsg(e),true); }
+}
+function writeResult(date,athId,patch){
+  var ref=S.db.collection('results').doc(date+'_'+athId);
+  return enqueue(async function(){
+    var snap=await ref.get(), p=clean(patch);
+    if(snap.exists) await ref.update(p); else await ref.set(Object.assign({date:date,athleteId:athId},p));
+  });
+}
+async function saveProfile(){
+  var a=myAth(); if(!a) return;
+  var patch={pr:{},prd:{},w:{},skills:{}};
+  Object.keys(LOADS).forEach(function(k){
+    var d=LOADS[k], pv=num(dv('p-pr-'+k)), wv=num(dv('p-w-'+k)), oldP=gpr(a,k), oldW=gw(a,k);
+    if(pv!==oldP){
+      if(pv==null){ patch.pr[k]={__delete__:true}; patch.prd[k]={__delete__:true}; }
+      else { patch.pr[k]=pv; patch.prd[k]=today(); if(d.bar&&wv===oldW&&oldW==null) patch.w[k]=pv; }
+    }
+    if(wv!==oldW){ patch.w[k]= wv==null ? {__delete__:true} : wv; }
+  });
+  Object.keys(SKILLS).forEach(function(k){
+    var lv=dv('p-lvl-'+k), mx=num(dv('p-sm-'+k)), old=gsk(a,k)||{};
+    if(lv===''){ if(old.level!=null) patch.skills[k]={__delete__:true}; return; }
+    var L=parseInt(lv,10);
+    if(L===old.level && (mx||null)===(old.max!=null?old.max:null)) return;
+    patch.skills[k]={level:L,max:mx||null,streak:L===old.level?(old.streak||0):0,fails:0,n:old.n||0};
+  });
+  prune(patch);
+  try{
+    if(Object.keys(patch).length) await enqueue(function(){ return S.db.doc('athletes/'+S.me).update(patch); });
+    S.fields={}; toast('Profil gemt.'); render();
+  }catch(e){ toast(errMsg(e),true); }
+}
+async function addAthlete(){
+  var name=(val('c-newname','')).trim(); if(!name){ toast('Skriv et navn.',true); return; }
+  var id='a_'+Date.now().toString(36)+Math.random().toString(36).slice(2,5);
+  var order=athleteList().reduce(function(m,x){return Math.max(m,x.a.order||0);},0)+1;
+  try{ await enqueue(function(){ return S.db.doc('athletes/'+id).set({name:name,order:order,pr:{},prd:{},w:{},n:{},skills:{}}); }); delete S.fields['c-newname']; toast(name+' er tilføjet.'); }
+  catch(e){ toast(errMsg(e),true); }
+}
+async function parseProgram(){
+  var raw=val('c-raw','').trim(); if(!raw){ toast('Indsæt programteksten først.',true); return; }
+  S.coach.busy=true; S.coach.msg='Claude læser programmet. Det kan tage op til et minut.'; S.coach.warn=[]; render();
+  try{
+    var obj=await S.sample.json(buildPrompt(raw));
+    var n=normProgram(obj);
+    if(n.err){ S.coach.msg=n.err; }
+    else { S.fields['c-json']=JSON.stringify(n.program,null,2); S.coach.warn=n.warn; S.coach.msg='Færdig. Tjek blokkene og tryk Gem.'; }
+  }catch(e){
+    var c=e&&e.code;
+    S.coach.msg = c==='not_granted'?'Du har ikke givet siden lov til at bruge Claude.':c==='rate_limited'?'For mange forsøg. Prøv igen om lidt.':c==='invalid_json'?'Claude svarede ikke i det rigtige format. Prøv igen.':'Det lykkedes ikke. Prøv igen eller brug skabelonen.';
+  }
+  S.coach.busy=false; render();
+}
+async function saveProgram(){
+  var txt=val('c-json','').trim(); if(!txt){ toast('Ingen program at gemme.',true); return; }
+  var obj; try{ obj=JSON.parse(txt); }catch(e){ S.coach.msg='Programmet er ikke gyldig JSON. Ret fejlen og prøv igen.'; render(); return; }
+  var n=normProgram(obj); if(n.err){ S.coach.msg=n.err; render(); return; }
+  var doc=Object.assign({date:S.date,updatedAt:Date.now()},n.program);
+  if(typeof doc.draft!=='boolean') doc.draft=false;
+  try{ await enqueue(function(){ return S.db.doc('workouts/'+S.date).set(clean(doc)); }); S.coach.msg=''; S.coach.warn=n.warn; S.fields['c-json']=''; toast('Program gemt til '+S.date+'.'); S.tab='today'; render(); }
+  catch(e){ toast(errMsg(e),true); }
+}
+async function importSeed(){
+  var sd=window.SEED||{}; S.confirm=null; var n=0;
+  try{
+    ['athletes','workouts','results'].forEach(function(col){
+      Object.keys(sd[col]||{}).forEach(function(id){ n++; enqueue(function(){ return S.db.doc(col+'/'+id).set(clean(sd[col][id])); }); });
+    });
+    await Q; toast(n+' dokumenter er importeret.');
+  }catch(e){ toast(errMsg(e),true); }
+}
+async function doLogin(){
+  var em=dv('lg-email').trim(), pw=dv('lg-pw');
+  if(!em||!pw){ S.loginErr='Skriv både e-mail og adgangskode.'; render(); return; }
+  try{ S.loginErr=''; await window.coachAuth.signIn(em,pw); S.tab='coach'; render(); }
+  catch(e){ S.loginErr=(e&&e.message==='not-coach')?'Den konto har ikke coach-adgang.':'Forkert e-mail eller adgangskode.'; render(); }
+}
+async function releaseDrafts(){
+  var ds=Object.keys(S.workouts).filter(function(d){return S.workouts[d].draft;});
+  S.confirm=null;
+  try{
+    for(var i=0;i<ds.length;i++){ (function(d){ return enqueue(function(){ return S.db.doc('workouts/'+d).update({draft:false}); }); })(ds[i]); }
+    await Q; toast(ds.length+' pas er frigivet til holdet.');
+  }catch(e){ toast(errMsg(e),true); }
+}
+async function dropDrafts(){
+  var ds=Object.keys(S.workouts).filter(function(d){return S.workouts[d].draft;});
+  S.confirm=null;
+  try{
+    ds.forEach(function(d){ enqueue(function(){ return S.db.doc('workouts/'+d).delete(); }); });
+    await Q; toast(ds.length+' kladder er slettet.');
+  }catch(e){ toast(errMsg(e),true); }
+}
+async function moveDay(){
+  var to=dv('c-move'), from=S.date, w=S.workouts[from];
+  if(!w||!/^\d{4}-\d{2}-\d{2}$/.test(to)){ toast('Vælg en dato at flytte til.',true); return; }
+  if(to===from){ toast('Vælg en anden dato.',true); return; }
+  if(S.workouts[to]){ toast('Der ligger allerede et pas på den dato.',true); return; }
+  var doc=Object.assign({},w,{date:to,updatedAt:Date.now()});
+  try{
+    await enqueue(function(){ return S.db.doc('workouts/'+to).set(clean(doc)); });
+    await enqueue(function(){ return S.db.doc('workouts/'+from).delete(); });
+    delete S.fields['c-move']; S.date=to; toast('Passet er flyttet til '+shortLabel(to)+'.');
+  }catch(e){ toast(errMsg(e),true); }
+}
+function copyStatus(){
+  var t=S.coach.status;
+  var fallback=function(){ var ta=$('#c-status'); if(ta){ ta.removeAttribute('readonly'); ta.focus(); ta.select(); toast('Markeret. Kopiér med tastaturet.'); } };
+  try{ navigator.clipboard.writeText(t).then(function(){ toast('Kopieret.'); },fallback); }catch(e){ fallback(); }
+}
+
+document.addEventListener('click',function(ev){
+  var b=ev.target.closest('[data-act]'); if(!b||b.disabled) return;
+  var a=b.getAttribute('data-act');
+  if(a==='tab'){ S.tab=b.getAttribute('data-tab'); render(); window.scrollTo(0,0); }
+  else if(a==='d-prev'){ S.date=shiftDate(S.date,-1); S.dateTouched=true; S.fields={}; render(); }
+  else if(a==='d-next'){ S.date=shiftDate(S.date,1); S.dateTouched=true; S.fields={}; render(); }
+  else if(a==='d-today'){ S.date=today(); S.dateTouched=true; S.fields={}; render(); }
+  else if(a==='goto'){ S.date=b.getAttribute('data-date'); S.dateTouched=true; S.fields={}; S.tab='today'; render(); window.scrollTo(0,0); }
+  else if(a==='pick'){ S.me=b.getAttribute('data-id'); lsSet('tl-me',S.me); render(); }
+  else if(a==='to-log'){ var el=$('#logpanel'); if(el) el.scrollIntoView({behavior:'smooth',block:'start'}); }
+  else if(a==='save-log') saveLog();
+  else if(a==='save-profile') saveProfile();
+  else if(a==='add-athlete') addAthlete();
+  else if(a==='rm-ask'){ S.confirm=b.getAttribute('data-id'); render(); }
+  else if(a==='rm-cancel'){ S.confirm=null; render(); }
+  else if(a==='seed-ask'){ S.confirm='seed'; render(); }
+  else if(a==='import-seed') importSeed();
+  else if(a==='do-login') doLogin();
+  else if(a==='do-logout'){ window.coachAuth.signOut().then(function(){ S.tab='today'; render(); }); }
+  else if(a==='release-ask'){ S.confirm='release'; render(); }
+  else if(a==='drop-ask'){ S.confirm='drop'; render(); }
+  else if(a==='release') releaseDrafts();
+  else if(a==='drop-drafts') dropDrafts();
+  else if(a==='move-day') moveDay();
+  else if(a==='rm-athlete'){ var id=b.getAttribute('data-id'); S.confirm=null; enqueue(function(){ return S.db.doc('athletes/'+id).delete(); }).then(function(){ if(S.me===id){ S.me=null; } toast('Atleten er fjernet. Gamle resultater ligger stadig.'); }).catch(function(e){ toast(errMsg(e),true); }); }
+  else if(a==='parse') parseProgram();
+  else if(a==='template'){ S.fields['c-json']=JSON.stringify(TEMPLATE,null,2); S.coach.msg='Skabelonen er indsat. Ret i den og tryk Gem.'; S.coach.warn=[]; render(); }
+  else if(a==='load-day'){ var w=S.workouts[S.date]; if(w){ var c=Object.assign({},w); delete c.date; delete c.updatedAt; S.fields['c-json']=JSON.stringify(c,null,2); S.coach.msg='Dagens program er hentet ind. Ret og tryk Gem.'; render(); } }
+  else if(a==='save-program') saveProgram();
+  else if(a==='del-program'){ enqueue(function(){ return S.db.doc('workouts/'+S.date).delete(); }).then(function(){ toast('Programmet er slettet.'); }).catch(function(e){ toast(errMsg(e),true); }); }
+  else if(a==='make-status'){ S.coach.status=buildStatus(); render(); }
+  else if(a==='copy-status') copyStatus();
+});
+document.addEventListener('input',function(ev){ var t=ev.target; if(t.id&&t.closest&&t.closest('#app')) S.fields[t.id]=t.value; });
+document.addEventListener('change',function(ev){
+  var t=ev.target; if(!t.closest||!t.closest('#app')) return;
+  if(t.id) S.fields[t.id]=t.value;
+  if(t.id==='who'){ S.me=t.value||null; lsSet('tl-me',S.me||''); S.fields={}; render(); }
+  else if(t.id==='dsel' && t.value){ S.date=t.value; S.dateTouched=true; S.fields={}; render(); }
+});
+document.addEventListener('focusout',function(){
+  setTimeout(function(){
+    var a=document.activeElement;
+    var typing=a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT')&&$('#app').contains(a);
+    if(S.dirty&&!typing) render();
+  },250);
+});
+
+/* ---------- Start ---------- */
+function ensureMe(){
+  if(S.me && S.athletes[S.me]) return;
+  var saved=lsGet('tl-me');
+  S.me = (saved && S.athletes[saved]) ? saved : null;
+}
+function autoDate(){
+  if(S.dateTouched||S.autoDone) return;
+  S.autoDone=true;
+  if(visible(S.workouts[S.date])) return;
+  var nx=nextWorkoutDate();
+  if(nx){ S.date=nx; return; }
+  var ds=visibleDates(); if(ds.length) S.date=ds[ds.length-1];
+}
+async function init(){
+  render();
+  var C=window.claude;
+  if(!C||!C.use){ S.noRuntime=true; render(); return; }
+  try{ S.db=await C.use('db'); }catch(e){ S.db=null; }
+  try{ S.user=await C.use('user'); }catch(e){ S.user=null; }
+  try{ S.sample=await C.use('sample'); }catch(e){ S.sample=null; }
+  if(S.user){ try{ S.canCoach=await S.user.canEdit(); S.canWrite=await S.user.can('data.write'); }catch(e){} }
+  var me0=lsGet('tl-me'); if(me0) S.me=me0;
+  if(!S.db){ render(); return; }
+  var onErr=function(e){ S.err='Kunne ikke hente data ('+(e&&e.code||'fejl')+').'; schedule(); };
+  S.db.collection('athletes').onSnapshot(function(snap){
+    var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); }); S.athletes=o; S.loaded.a=true; ensureMe(); schedule();
+  },onErr);
+  var unsubW=null;
+  function subWorkouts(){
+    if(unsubW) unsubW();
+    var q=S.db.collection('workouts');
+    if(window.coachAuth && !S.canCoach) q=q.where('draft','==',false);
+    unsubW=q.onSnapshot(function(snap){
+      var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); }); S.workouts=o; S.loaded.w=true; autoDate(); schedule();
+    },onErr);
+  }
+  subWorkouts();
+  if(window.coachAuth) window.coachAuth.onChange=function(isCoach){
+    if(isCoach===S.canCoach) return;
+    S.canCoach=isCoach; S.confirm=null; S.fields={};
+    if(!isCoach&&(S.tab==='coach')) S.tab='today';
+    subWorkouts(); render();
+  };
+  S.db.collection('results').orderBy('date','desc').limit(400).onSnapshot(function(snap){
+    var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); }); S.results=o; S.loaded.r=true; schedule();
+  },onErr);
+  render();
+}
+init();
+})();
+</script>
+</body>
+</html>
