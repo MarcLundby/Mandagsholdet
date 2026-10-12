@@ -1224,7 +1224,7 @@ function parseKondiText(txt){
 function kondiForm(w){
   var has=w&&(w.blocks||[]).some(function(b){return b.type==='metcon';});
   var h='<section class="sec"><h2>Ugens kondi</h2><p class="muted small">Indsæt kondien for '+esc(dayLabel(S.date))+' (datoen øverst). '
-    +(has?'Der ligger allerede en kondi på dagen. Den erstattes, men gemte resultater bevares.':(w?'Den lægges først i dagens pas, før styrkedelen.':'Der ligger intet pas på dagen endnu. Der laves et pas kun med kondi.'))+'</p>'
+    +(has?'Der ligger allerede en kondi på dagen. "Erstat kondi" skifter den første ud (gemte resultater bevares), og "Tilføj som ekstra kondi" lægger en ny efter de andre.':(w?'Den lægges først i dagens pas, før styrkedelen.':'Der ligger intet pas på dagen endnu. Der laves et pas kun med kondi.'))+'</p>'
     +'<div class="g2"><label class="f">Titel<input id="k-title" value="'+esc(val('k-title','Kondi'))+'"></label>'
     +'<label class="f">Format<input id="k-format" placeholder="fx AMRAP 15 min" value="'+esc(val('k-format',''))+'"></label></div>'
     +'<div class="g2"><label class="f">Slags kondi<select id="k-mode">'+edOpts(MCMODE,val('k-mode','mix'))+'</select></label>'
@@ -1232,10 +1232,12 @@ function kondiForm(w){
     +'<label class="f">Kondi-workout, én linje pr. del<textarea id="k-text" placeholder="# Del 1&#10;@row 5 x 500 m, 2 min hvile&#10;10 shuttle runs&#10;12 DB S2OH" style="min-height:150px">'+esc(val('k-text',''))+'</textarea></label>'
     +'<p class="hint">Skriv en linje for hvert led. Start en linje med <b>@row</b>, <b>@bike</b> (Echo bike), <b>@ski</b>, <b>@bikeerg</b> eller <b>@run</b>, så kan holdet logge kalorier og meter på den. Start med <b>#</b> for en overskrift. Kendte øvelser (DB S2OH, thrusters, sled push, BMU, pull-ups osv.) genkendes og logges med vægt og skalering som resten af programmet. Øvrige linjer logges som øvelser med vægt, gennemført og RPE. Start en linje med <b>~</b>, hvis den kun er tekst (fx hvile). <b>Højeste tal</b> bruges til runder + reps, kalorier eller meter, <b>Laveste tid</b> til workouts på tid.</p>'
     +'<div class="row">'+Object.keys(MACH).map(function(k){return '<button class="btn ghost sm" data-act="k-add" data-k="'+k+'">+ '+esc(MACH[k])+'</button>';}).join('')+'</div>'
-    +'<div class="row"><button class="btn" data-act="k-save">'+(has?'Erstat kondi':'Læg kondi ind')+'</button></div></section>';
+    +'<div class="row"><button class="btn" data-act="k-save">'+(has?'Erstat kondi':'Læg kondi ind')+'</button>'
+    +(has?'<button class="btn ghost" data-act="k-add-block">Tilføj som ekstra kondi</button>':'')+'</div>'
+    +(has?'<p class="hint">Er der flere kondier samme dag (fx to AMRAPs), så tilføj dem som ekstra kondi. Hver får sit eget resultatfelt og sin egen log.</p>':'')+'</section>';
   return h;
 }
-async function kondiSave(){
+async function kondiSave(add){
   var txt=val('k-text','').trim(); if(!txt){ toast('Skriv kondien først.',true); return; }
   var blk={title:val('k-title','Kondi').trim()||'Kondi',type:'metcon',format:val('k-format','').trim(),notes:'',
     metric:val('k-metric','reps'),mode:val('k-mode','mix'),items:parseKondiText(txt)};
@@ -1243,8 +1245,8 @@ async function kondiSave(){
   if(old){
     doc=clean(old); delete doc.updatedAt;
     var bl=Array.isArray(doc.blocks)?doc.blocks:[], ix=-1;
-    bl.forEach(function(b,i){ if(ix<0&&b.type==='metcon') ix=i; });
-    if(ix>=0) bl[ix]=blk; else bl.unshift(blk);
+    bl.forEach(function(b,i){ if(b.type==='metcon'){ if(add) ix=i; else if(ix<0) ix=i; } });
+    if(add) bl.splice(ix>=0?ix+1:0,0,blk); else if(ix>=0) bl[ix]=blk; else bl.unshift(blk);
     doc.blocks=bl;
   } else doc={title:'Kondi',blocks:[blk],draft:false};
   var n=normProgram(doc); if(n.err){ toast(n.err,true); return; }
@@ -1354,7 +1356,8 @@ document.addEventListener('click',function(ev){
   else if(a==='move-day') moveDay();
   else if(a==='rm-athlete'){ var id=b.getAttribute('data-id'); S.confirm=null; enqueue(function(){ return S.db.doc('athletes/'+id).delete(); }).then(function(){ if(S.me===id){ S.me=null; } toast('Atleten er fjernet. Gamle resultater ligger stadig.'); }).catch(function(e){ toast(errMsg(e),true); }); }
   else if(a==='k-add'){ var kk=b.getAttribute('data-k'), cur=val('k-text',''); S.fields['k-text']=cur+(cur&&!/\n$/.test(cur)?'\n':'')+'@'+kk+' '; render(); }
-  else if(a==='k-save') kondiSave();
+  else if(a==='k-save') kondiSave(false);
+  else if(a==='k-add-block') kondiSave(true);
   else if(a==='ed-open') edOpen();
   else if(a==='ed-cancel'){ S.ed=null; render(); }
   else if(a==='ed-save') edSave();
