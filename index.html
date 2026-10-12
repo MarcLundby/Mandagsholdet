@@ -264,7 +264,13 @@ var LOADS = {
   benchPress:{name:'Bænkpres',unit:'kg',step:2.5,ref:140,bar:1},
   snatch:{name:'Snatch',unit:'kg',step:2.5,ref:130,bar:1},
   clean:{name:'Clean',unit:'kg',step:2.5,ref:160,bar:1},
-  cleanJerk:{name:'Clean & jerk',unit:'kg',step:2.5,ref:150,bar:1}
+  cleanJerk:{name:'Clean & jerk',unit:'kg',step:2.5,ref:150,bar:1},
+  dbs2oh:{name:'DB shoulder-to-overhead',unit:'kg pr. hånd',step:2.5,ref:30},
+  dbthruster:{name:'DB thruster',unit:'kg pr. hånd',step:2.5,ref:30},
+  dbsnatch:{name:'DB snatch',unit:'kg',step:2.5,ref:35},
+  kbswing:{name:'KB swing',unit:'kg',step:4,ref:32},
+  wallball:{name:'Wall ball',unit:'kg',step:1,ref:9},
+  sled:{name:'Sled push',unit:'kg',step:5,ref:150}
 };
 var SKILLS = {
   pullup:{name:'Pull-ups', ladder:['Ring rows','Pull-up med elastik','Strict pull-up','Kipping pull-up','Chest-to-bar']},
@@ -411,6 +417,7 @@ function fmtEntry(e){
   var rpe=e.rpe?' · RPE '+nf(e.rpe):'';
   if(e.kind==='load') return e.name+': '+nf(e.load)+' '+(e.unit||'kg')+' · '+(COMP[e.comp]||'')+rpe;
   if(e.kind==='skill') return e.name+': '+e.levelName+' · '+(COMP[e.comp]||'')+(e.max?' · max '+e.max:'')+rpe;
+  if(e.kind==='free') return (e.name||'Øvelse')+': '+[e.load!=null&&e.load!==''?nf(e.load)+' kg':'',COMP[e.comp]||'',e.rpe?'RPE '+nf(e.rpe):'',e.note||''].filter(Boolean).join(' · ');
   if(e.kind==='machine') return (e.name||MACH[e.machine]||'Maskine')+': '+[e.cal!=null&&e.cal!==''?nf(e.cal)+' cal':'',e.m!=null&&e.m!==''?nf(e.m)+' m':'',e.time?e.time:''].filter(Boolean).join(' · ')+(e.note?' ('+e.note+')':'');
   if(e.kind==='metcon') return 'Kondi'+(e.title?' ('+e.title+')':'')+': '+(e.score||'–')+(e.scale?' · '+(MCSCALE[e.scale]||e.scale):'')+rpe+(e.note?' ('+e.note+')':'');
   if(e.kind==='overall') return 'Samlet: '+(e.score||'–')+rpe+(e.note?' ('+e.note+')':'');
@@ -613,6 +620,7 @@ function blockHtml(b,w,ath){
   (b.items||[]).forEach(function(it){
     if(it.type==='load') h+=loadItem(it,w,ath);
     else if(it.type==='skill') h+=skillItem(it,ath);
+    else if(it.type==='free') h+='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||'Øvelse')+'</div>'+(it.reps?'<div class="scheme">'+esc(it.reps)+'</div>':'')+'</div></div>'+(it.note?'<div class="hint">'+esc(it.note)+'</div>':'')+'</div>';
     else if(it.type==='machine') h+='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||MACH[it.machine]||'Maskine')+'</div><div class="scheme">'+esc(MACH[it.machine]||'')+' · log cal og/eller meter</div></div></div>'+(it.note?'<div class="hint">'+esc(it.note)+'</div>':'')+'</div>';
     else if(it.head) h+='<div class="item head">'+esc(it.text||'')+'</div>';
     else h+='<div class="item"><div>'+esc(it.text||'')+'</div></div>';
@@ -675,6 +683,26 @@ function rpeSel(id,v){
   for(var r=5;r<=10;r+=0.5){ o+='<option value="'+r+'"'+(String(v)===String(r)?' selected':'')+'>'+nf(r)+'</option>'; }
   return '<select id="'+id+'">'+o+'</select>';
 }
+function extraRows(b,bi,items){
+  var h='';
+  (b.items||[]).forEach(function(it,ii){
+    if(it.type==='machine'){
+      var m=items['mx_'+bi+'_'+ii]||{}, mid='lg-mx'+bi+'_'+ii+'-';
+      h+='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||MACH[it.machine])+'</div><div class="hint">'+esc(MACH[it.machine])+'</div></div><div class="log">'
+        +'<label class="f">Kalorier<input id="'+mid+'c" inputmode="decimal" value="'+esc(val(mid+'c',m.cal!=null?nf(m.cal):''))+'"></label>'
+        +'<label class="f">Meter<input id="'+mid+'m" inputmode="decimal" value="'+esc(val(mid+'m',m.m!=null?nf(m.m):''))+'"></label>'
+        +'<label class="f">Tid (valgfri)<input id="'+mid+'t" placeholder="fx 1:42" value="'+esc(val(mid+'t',m.time||''))+'"></label></div></div>';
+    } else if(it.type==='free'){
+      var f=items['fr_'+bi+'_'+ii]||{}, fid='lg-fr'+bi+'_'+ii+'-';
+      h+='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||'Øvelse')+'</div><div class="hint">'+esc(it.reps||'')+'</div></div><div class="log">'
+        +'<label class="f">Vægt (valgfri)<input id="'+fid+'w" inputmode="decimal" value="'+esc(val(fid+'w',f.load!=null?nf(f.load):''))+'"></label>'
+        +'<label class="f wide">Gennemført'+compSel(fid+'c',val(fid+'c',f.comp||'full'))+'</label>'
+        +'<label class="f">RPE'+rpeSel(fid+'r',val(fid+'r',f.rpe!=null?f.rpe:''))+'</label>'
+        +'<label class="f wide">Resultat eller note<input id="'+fid+'n" placeholder="fx 8 shuttles, 25 m pr. længde" value="'+esc(val(fid+'n',f.note||''))+'"></label></div></div>';
+    }
+  });
+  return h;
+}
 function logPanel(w,ath){
   if(!ath||!S.db||S.canWrite===false) return '';
   var rows=moveRows(w), d=resDoc(S.date,S.me), items=(d&&d.items)||{};
@@ -688,15 +716,9 @@ function logPanel(w,ath){
       +'<label class="f">Rx eller skaleret<select id="'+id+'x">'+Object.keys(MCSCALE).map(function(k){return '<option value="'+k+'"'+(val(id+'x',e.scale||'rx')===k?' selected':'')+'>'+esc(MCSCALE[k])+'</option>';}).join('')+'</select></label>'
       +'<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e.rpe!=null?e.rpe:''))+'</label>'
       +'<label class="f wide">Hvad du skalerede, vægte du brugte og andet<input id="'+id+'n" placeholder="fx 15 kg DB, singles i stedet for double unders" value="'+esc(val(id+'n',e.note||''))+'"></label></div></div>';
-    (b.items||[]).forEach(function(it,ii){
-      if(it.type!=='machine') return;
-      var m=items['mx_'+bi+'_'+ii]||{}, mid='lg-mx'+bi+'_'+ii+'-';
-      h+='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||MACH[it.machine])+'</div><div class="hint">'+esc(MACH[it.machine])+'</div></div><div class="log">'
-        +'<label class="f">Kalorier<input id="'+mid+'c" inputmode="decimal" value="'+esc(val(mid+'c',m.cal!=null?nf(m.cal):''))+'"></label>'
-        +'<label class="f">Meter<input id="'+mid+'m" inputmode="decimal" value="'+esc(val(mid+'m',m.m!=null?nf(m.m):''))+'"></label>'
-        +'<label class="f">Tid (valgfri)<input id="'+mid+'t" placeholder="fx 1:42" value="'+esc(val(mid+'t',m.time||''))+'"></label></div></div>';
-    });
+    h+=extraRows(b,bi,items);
   });
+  (w.blocks||[]).forEach(function(b,bi){ if(b.type!=='metcon') h+=extraRows(b,bi,items); });
   rows.forEach(function(r){
     var e=items['mv_'+r.key]||{}, id='lg-'+r.id+'-';
     if(r.type==='load'){
@@ -914,6 +936,7 @@ function normProgram(obj){
         var lv=parseInt(it.level,10), last=SKILLS[it.skill].ladder.length-1;
         return {type:'skill',skill:it.skill,label:String(it.label||''),reps:it.reps==null?'':String(it.reps),level:isFinite(lv)?Math.max(0,Math.min(last,lv)):null,note:String(it.note||'')};
       }
+      if(it&&it.type==='free') return {type:'free',label:String(it.label||''),reps:it.reps==null?'':String(it.reps),note:String(it.note||'')};
       if(it&&it.type==='machine'&&MACH[it.machine]) return {type:'machine',machine:it.machine,label:String(it.label||''),note:String(it.note||'')};
       if(it&&(it.type==='load'||it.type==='skill')){ warn.push('Blok '+(bi+1)+', punkt '+(ii+1)+': ukendt bevægelse ('+(it.move||it.skill)+'). Gemmes som tekst.'); return {type:'other',text:String(it.label||it.move||it.skill||'')}; }
       var o={type:'other',text:String((it&&it.text)||'')}; if(it&&it.head) o.head=true; return o;
@@ -973,13 +996,19 @@ async function saveLog(){
     }
   });
   (w.blocks||[]).forEach(function(b,bi){
-    if(b.type!=='metcon') return;
-    var id='lg-mc'+bi+'-', sc=dv(id+'s').trim(), nt=dv(id+'n').trim(), rp=num(dv(id+'r'));
-    if(sc||nt||rp!=null) items['mc_'+bi]={kind:'metcon',title:b.title||'',score:sc,scale:dv(id+'x')||'rx',rpe:rp,note:nt,ts:Date.now()};
+    if(b.type==='metcon'){
+      var id='lg-mc'+bi+'-', sc=dv(id+'s').trim(), nt=dv(id+'n').trim(), rp=num(dv(id+'r'));
+      if(sc||nt||rp!=null) items['mc_'+bi]={kind:'metcon',title:b.title||'',score:sc,scale:dv(id+'x')||'rx',rpe:rp,note:nt,ts:Date.now()};
+    }
     (b.items||[]).forEach(function(it,ii){
-      if(it.type!=='machine') return;
-      var mid='lg-mx'+bi+'_'+ii+'-', cal=num(dv(mid+'c')), mt=num(dv(mid+'m')), tm=dv(mid+'t').trim();
-      if(cal!=null||mt!=null||tm) items['mx_'+bi+'_'+ii]={kind:'machine',machine:it.machine,name:it.label||MACH[it.machine],cal:cal,m:mt,time:tm,ts:Date.now()};
+      if(it.type==='machine'){
+        var mid='lg-mx'+bi+'_'+ii+'-', cal=num(dv(mid+'c')), mt=num(dv(mid+'m')), tm=dv(mid+'t').trim();
+        if(cal!=null||mt!=null||tm) items['mx_'+bi+'_'+ii]={kind:'machine',machine:it.machine,name:it.label||MACH[it.machine],cal:cal,m:mt,time:tm,ts:Date.now()};
+      } else if(it.type==='free'){
+        var fid='lg-fr'+bi+'_'+ii+'-', fw=dv(fid+'w').trim(), fn=dv(fid+'n').trim(), fr=num(dv(fid+'r'));
+        if(fw!==''&&num(fw)==null){ bad='Vægten for '+(it.label||'øvelsen')+' skal være et tal.'; return; }
+        if(fw||fn||fr!=null) items['fr_'+bi+'_'+ii]={kind:'free',name:it.label||'Øvelse',load:fw===''?null:num(fw),comp:dv(fid+'c')||'full',rpe:fr,note:fn,ts:Date.now()};
+      }
     });
   });
   if(bad){ toast(bad,true); return; }
@@ -1053,7 +1082,7 @@ function edInput(label,path,value,extra){
   return '<label class="f">'+esc(label)+'<input data-ed="'+path+'"'+(extra||'')+' value="'+esc(value)+'"></label>';
 }
 function edItem(bi,ii,it,n){
-  var p='blocks.'+bi+'.items.'+ii, h='<div class="edit"><div class="row"><span class="edtag grow">'+(it.type==='load'?'Vægtøvelse':it.type==='skill'?'Gymnastik':it.type==='machine'?'Maskine':'Tekst')+'</span>'
+  var p='blocks.'+bi+'.items.'+ii, h='<div class="edit"><div class="row"><span class="edtag grow">'+(it.type==='load'?'Vægtøvelse':it.type==='skill'?'Gymnastik':it.type==='machine'?'Maskine':it.type==='free'?'Øvrig øvelse (logges)':'Tekst')+'</span>'
     +'<button class="btn ghost sm" data-act="ed-up" data-b="'+bi+'" data-i="'+ii+'"'+(ii===0?' disabled':'')+' aria-label="Flyt op">↑</button>'
     +'<button class="btn ghost sm" data-act="ed-down" data-b="'+bi+'" data-i="'+ii+'"'+(ii===n-1?' disabled':'')+' aria-label="Flyt ned">↓</button>'
     +'<button class="btn danger sm" data-act="ed-del-item" data-b="'+bi+'" data-i="'+ii+'">Slet</button></div>';
@@ -1069,6 +1098,9 @@ function edItem(bi,ii,it,n){
       +'<div class="g2">'+edInput('Reps',p+'.reps',it.reps||'')
       +'<label class="f">Rx-niveau<select data-ed="'+p+'.level" data-edk="int">'+sk.ladder.map(function(nm,i){ return '<option value="'+i+'"'+(i===lv?' selected':'')+'>'+esc(nm)+'</option>'; }).join('')+'</select></label></div>'
       +edInput('Note',p+'.note',it.note||'');
+  } else if(it.type==='free'){
+    h+=edInput('Navn i programmet (fx 10 shuttle runs)',p+'.label',it.label||'')
+      +'<div class="g2">'+edInput('Reps',p+'.reps',it.reps||'')+edInput('Note',p+'.note',it.note||'')+'</div>';
   } else if(it.type==='machine'){
     h+=edInput('Navn i programmet (fx 5 x 500 m, 2 min hvile)',p+'.label',it.label||'')
       +'<label class="f">Maskine<select data-ed="'+p+'.machine">'+edOpts(MACH,it.machine)+'</select></label>'
@@ -1099,6 +1131,7 @@ function edEditor(){
     h+='<div class="row"><button class="btn ghost sm" data-act="ed-add" data-t="load" data-b="'+bi+'">+ Vægtøvelse</button>'
       +'<button class="btn ghost sm" data-act="ed-add" data-t="skill" data-b="'+bi+'">+ Gymnastik</button>'
       +'<button class="btn ghost sm" data-act="ed-add" data-t="machine" data-b="'+bi+'">+ Maskine</button>'
+      +'<button class="btn ghost sm" data-act="ed-add" data-t="free" data-b="'+bi+'">+ Øvrig øvelse</button>'
       +'<button class="btn ghost sm" data-act="ed-add" data-t="other" data-b="'+bi+'">+ Tekst</button></div></div>';
   });
   h+='<div class="row"><button class="btn ghost" data-act="ed-add-metcon">+ Kondi først i passet</button><button class="btn ghost" data-act="ed-add-block">+ Ny blok</button></div>'
@@ -1121,6 +1154,7 @@ function edAct(a,b){
     if(ty==='load') it={type:'load',move:Object.keys(LOADS)[0],label:'',reps:'',pct:100,note:''};
     else if(ty==='skill') it={type:'skill',skill:Object.keys(SKILLS)[0],label:'',reps:'',level:0,note:''};
     else if(ty==='machine') it={type:'machine',machine:'row',label:'',note:''};
+    else if(ty==='free') it={type:'free',label:'',reps:'',note:''};
     else it={type:'other',text:''};
     if(!Array.isArray(bl[bi].items)) bl[bi].items=[];
     bl[bi].items.push(it);
@@ -1144,6 +1178,36 @@ async function edSave(){
 }
 
 /* ---------- Ugens kondi (coach) ---------- */
+
+/* Genkender kendte øvelser i en tekstlinje, så de kan logges med vægt og skalering som resten af programmet */
+var DETECT=[
+  ['load','dbs2oh',/s2oh|shoulder[- ]?to[- ]?overhead/,/\b(db|dumbbell|hantel)/],
+  ['load','dbthruster',/thruster/,/\b(db|dumbbell|hantel)/],
+  ['load','dbsnatch',/snatch/,/\b(db|dumbbell|hantel)/],
+  ['load','kbswing',/swing/],['load','wallball',/wall ?ball/],['load','sled',/sled/],
+  ['load','sandbag',/sandbag/],['load','farmer',/farmer/],
+  ['load','wpullup',/weighted pull/],['load','wdips',/weighted dip/],
+  ['load','dbbench',/bench/,/\b(db|dumbbell|hantel)/],['load','dbrow',/\brow\b/,/\b(db|dumbbell|hantel)/],
+  ['load','dbpress',/press/,/\b(db|dumbbell|hantel)/],
+  ['load','dblunge',/lunge|step[- ]?up/],['load','bulgarian',/bulgarian|split squat/],
+  ['load','cleanJerk',/clean (&|and) jerk|c&j/],['load','snatch',/snatch/],['load','clean',/\bclean/],
+  ['load','ohSquat',/overhead squat|\bohs\b/],['load','frontSquat',/front squat/],['load','backSquat',/back squat/],
+  ['load','deadlift',/deadlift|dødløft/],['load','pushPress',/push press/],['load','strictPress',/strict press/],['load','benchPress',/bench|bænk/],
+  ['skill','muscleup',/muscle[- ]?up|\bbmu\b|\brmu\b/],['skill','hspu',/hspu|handstand push/],['skill','hsw',/handstand walk|\bhsw\b/],
+  ['skill','ttb',/toes[- ]?to[- ]?bar|\bttb\b/],['skill','rope',/rope climb/],['skill','lsit',/l[- ]?sit/],
+  ['skill','pistol',/pistol/],['skill','dips',/\bdips?\b/],['skill','pullup',/pull[- ]?ups?|chest[- ]?to[- ]?bar|\bc2b\b/]
+];
+function detectItem(l){
+  var low=l.toLowerCase(), rm=l.match(/^(\d+(?:\s*[-–]\s*\d+)?)\s+/), reps=rm?rm[1].replace(/\s+/g,''):'';
+  for(var i=0;i<DETECT.length;i++){
+    var d=DETECT[i];
+    if(d[2].test(low)&&(!d[3]||d[3].test(low))){
+      if(d[0]==='load'&&LOADS[d[1]]) return {type:'load',move:d[1],label:l,reps:reps,pct:100,note:''};
+      if(d[0]==='skill'&&SKILLS[d[1]]) return {type:'skill',skill:d[1],label:l,reps:reps,level:null,note:''};
+    }
+  }
+  return {type:'free',label:l,reps:reps,note:''};
+}
 function parseKondiText(txt){
   var items=[];
   String(txt).split(/\r?\n/).forEach(function(l){
@@ -1151,7 +1215,9 @@ function parseKondiText(txt){
     var m=l.match(/^@(\w+)\s*(.*)$/), k=m?m[1].toLowerCase():'';
     if(m&&MACH[k]) items.push({type:'machine',machine:k,label:m[2]||MACH[k],note:''});
     else if(l.charAt(0)==='#') items.push({type:'other',text:l.replace(/^#+\s*/,''),head:true});
-    else items.push({type:'other',text:l});
+    else if(l.charAt(0)==='~') items.push({type:'other',text:l.replace(/^~\s*/,'')});
+    else if(/^(rest|hvile|pause|\d+\s*(min|sek|s)\b.*(rest|hvile|pause))/i.test(l)) items.push({type:'other',text:l});
+    else items.push(detectItem(l));
   });
   return items;
 }
@@ -1164,7 +1230,7 @@ function kondiForm(w){
     +'<div class="g2"><label class="f">Slags kondi<select id="k-mode">'+edOpts(MCMODE,val('k-mode','mix'))+'</select></label>'
     +'<label class="f">Resultat måles som<select id="k-metric">'+edOpts(MCMETRIC,val('k-metric','reps'))+'</select></label></div>'
     +'<label class="f">Kondi-workout, én linje pr. del<textarea id="k-text" placeholder="# Del 1&#10;@row 5 x 500 m, 2 min hvile&#10;10 shuttle runs&#10;12 DB S2OH" style="min-height:150px">'+esc(val('k-text',''))+'</textarea></label>'
-    +'<p class="hint">Skriv en linje for hvert led. Start en linje med <b>@row</b>, <b>@bike</b> (Echo bike), <b>@ski</b>, <b>@bikeerg</b> eller <b>@run</b>, så kan holdet logge kalorier og meter på den. Start med <b>#</b> for en overskrift. Vægte og gymnastik kan du tilføje bagefter under Ret øvelser. <b>Højeste tal</b> bruges til runder + reps, kalorier eller meter, <b>Laveste tid</b> til workouts på tid.</p>'
+    +'<p class="hint">Skriv en linje for hvert led. Start en linje med <b>@row</b>, <b>@bike</b> (Echo bike), <b>@ski</b>, <b>@bikeerg</b> eller <b>@run</b>, så kan holdet logge kalorier og meter på den. Start med <b>#</b> for en overskrift. Kendte øvelser (DB S2OH, thrusters, sled push, BMU, pull-ups osv.) genkendes og logges med vægt og skalering som resten af programmet. Øvrige linjer logges som øvelser med vægt, gennemført og RPE. Start en linje med <b>~</b>, hvis den kun er tekst (fx hvile). <b>Højeste tal</b> bruges til runder + reps, kalorier eller meter, <b>Laveste tid</b> til workouts på tid.</p>'
     +'<div class="row">'+Object.keys(MACH).map(function(k){return '<button class="btn ghost sm" data-act="k-add" data-k="'+k+'">+ '+esc(MACH[k])+'</button>';}).join('')+'</div>'
     +'<div class="row"><button class="btn" data-act="k-save">'+(has?'Erstat kondi':'Læg kondi ind')+'</button></div></section>';
   return h;
