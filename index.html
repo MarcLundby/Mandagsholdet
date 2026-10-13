@@ -88,6 +88,7 @@ label.f input,label.f select{text-transform:none;letter-spacing:0;color:var(--in
 .bhead h2{font-size:26px}
 .fmt{font-weight:500}
 .bnotes{padding:0 16px 10px;color:var(--mute)}
+.alt{margin-top:4px}.alt summary{cursor:pointer;font-size:13px;color:var(--mute);padding:4px 0}
 .edblk{border:1px solid var(--line);border-radius:10px;background:var(--surface);padding:12px;display:flex;flex-direction:column;gap:10px}
 .edit{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;background:color-mix(in srgb,var(--accent-soft) 25%,var(--surface))}
 .edtag{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
@@ -413,13 +414,28 @@ function lastMove(athId,key,beforeDate){
     .sort(function(a,b){return b.date.localeCompare(a.date);});
   return docs.length?{date:docs[0].date,e:docs[0].items['mv_'+key]}:null;
 }
+function fmtAlt(a){
+  var p=[]; if(a.cal!=null) p.push(nf(a.cal)+' cal'); if(a.m!=null) p.push(nf(a.m)+' m'); if(a.time) p.push(a.time);
+  if(a.load!=null) p.push(nf(a.load)+' kg'); if(a.levelName) p.push(a.levelName); if(a.reps) p.push(a.reps+' reps'); if(a.note) p.push(a.note);
+  return a.name+(p.length?': '+p.join(' · '):'');
+}
+function entryOrder(k){
+  var m=k.match(/^(?:mc|it|mx|fr)_(\d+)(?:_(\d+))?$/);
+  if(m) return [parseInt(m[1],10),m[2]==null?-1:parseInt(m[2],10)];
+  return k==='overall'?[2000,0]:[1000,0];
+}
+function entryKeys(items,withOverall){
+  return Object.keys(items||{}).filter(function(k){ var e=items[k]; return e&&!e.derived&&(withOverall||k!=='overall'); })
+    .sort(function(a,b){ var x=entryOrder(a), y=entryOrder(b); return x[0]-y[0]||x[1]-y[1]||a.localeCompare(b); });
+}
 function fmtEntry(e){
   var rpe=e.rpe?' · RPE '+nf(e.rpe):'';
-  if(e.kind==='load') return e.name+': '+nf(e.load)+' '+(e.unit||'kg')+' · '+(COMP[e.comp]||'')+rpe;
-  if(e.kind==='skill') return e.name+': '+e.levelName+' · '+(COMP[e.comp]||'')+(e.max?' · max '+e.max:'')+rpe;
-  if(e.kind==='free') return (e.name||'Øvelse')+': '+[e.load!=null&&e.load!==''?nf(e.load)+' kg':'',COMP[e.comp]||'',e.rpe?'RPE '+nf(e.rpe):'',e.note||''].filter(Boolean).join(' · ');
+  if(e.alt) return (e.label||e.name||'Øvelse')+' → '+fmtAlt(e.alt)+rpe;
+  if(e.kind==='load') return (e.label||e.name)+': '+(e.load!=null?nf(e.load)+' '+(e.unit||'kg'):'')+(e.reps?' · '+e.reps+' reps':'')+' · '+(COMP[e.comp]||'')+rpe;
+  if(e.kind==='skill') return (e.label||e.name)+': '+e.levelName+(e.reps?' · '+e.reps+' reps':'')+' · '+(COMP[e.comp]||'')+(e.max?' · max '+e.max:'')+rpe;
+  if(e.kind==='free') return (e.name||'Øvelse')+': '+[e.load!=null&&e.load!==''?nf(e.load)+' kg':'',e.reps?e.reps+' reps':'',COMP[e.comp]||'',e.rpe?'RPE '+nf(e.rpe):'',e.note||''].filter(Boolean).join(' · ');
   if(e.kind==='machine') return (e.name||MACH[e.machine]||'Maskine')+': '+[e.cal!=null&&e.cal!==''?nf(e.cal)+' cal':'',e.m!=null&&e.m!==''?nf(e.m)+' m':'',e.time?e.time:''].filter(Boolean).join(' · ')+(e.note?' ('+e.note+')':'');
-  if(e.kind==='metcon') return 'Kondi'+(e.title?' ('+e.title+')':'')+': '+(e.score||'–')+(e.scale?' · '+(MCSCALE[e.scale]||e.scale):'')+rpe+(e.note?' ('+e.note+')':'');
+  if(e.kind==='metcon') return 'Kondi'+(e.title?' ('+e.title+')':'')+': '+(e.rounds!=null?e.rounds+' runder'+(e.extra?' + '+e.extra+' reps':''):(e.score||'–'))+(e.scale?' · '+(MCSCALE[e.scale]||e.scale):'')+rpe+(e.note?' ('+e.note+')':'');
   if(e.kind==='overall') return 'Samlet: '+(e.score||'–')+rpe+(e.note?' ('+e.note+')':'');
   return '';
 }
@@ -445,7 +461,7 @@ function mcAll(){
     var w=S.workouts[r.date]; if(!w||!Array.isArray(w.blocks)) return;
     Object.keys(r.items).forEach(function(ik){
       var e=r.items[ik];
-      if(e&&e.kind==='machine'&&ik.indexOf('mx_')===0){
+      if(e&&e.kind==='machine'&&!e.alt&&(ik.indexOf('mx_')===0||ik.indexOf('it_')===0)){
         var bi2=parseInt(ik.split('_')[1],10), bb=w.blocks[bi2]; if(!bb||bb.type!=='metcon') return;
         var key2=r.date+'|'+ik; if(!by[key2]) by[key2]={date:r.date,mode:'cardio',low:false,machine:true,rows:[]};
         by[key2].rows.push({id:r.athleteId,cal:e.cal,m:e.m}); return;
@@ -683,69 +699,132 @@ function rpeSel(id,v){
   for(var r=5;r<=10;r+=0.5){ o+='<option value="'+r+'"'+(String(v)===String(r)?' selected':'')+'>'+nf(r)+'</option>'; }
   return '<select id="'+id+'">'+o+'</select>';
 }
-function extraRows(b,bi,items){
-  var h='';
-  (b.items||[]).forEach(function(it,ii){
-    if(it.type==='machine'){
-      var m=items['mx_'+bi+'_'+ii]||{}, mid='lg-mx'+bi+'_'+ii+'-';
-      h+='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||MACH[it.machine])+'</div><div class="hint">'+esc(MACH[it.machine])+'</div></div><div class="log">'
-        +'<label class="f">Kalorier<input id="'+mid+'c" inputmode="decimal" value="'+esc(val(mid+'c',m.cal!=null?nf(m.cal):''))+'"></label>'
-        +'<label class="f">Meter<input id="'+mid+'m" inputmode="decimal" value="'+esc(val(mid+'m',m.m!=null?nf(m.m):''))+'"></label>'
-        +'<label class="f">Tid (valgfri)<input id="'+mid+'t" placeholder="fx 1:42" value="'+esc(val(mid+'t',m.time||''))+'"></label></div></div>';
-    } else if(it.type==='free'){
-      var f=items['fr_'+bi+'_'+ii]||{}, fid='lg-fr'+bi+'_'+ii+'-';
-      h+='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||'Øvelse')+'</div><div class="hint">'+esc(it.reps||'')+'</div></div><div class="log">'
-        +'<label class="f">Vægt (valgfri)<input id="'+fid+'w" inputmode="decimal" value="'+esc(val(fid+'w',f.load!=null?nf(f.load):''))+'"></label>'
-        +'<label class="f wide">Gennemført'+compSel(fid+'c',val(fid+'c',f.comp||'full'))+'</label>'
-        +'<label class="f">RPE'+rpeSel(fid+'r',val(fid+'r',f.rpe!=null?f.rpe:''))+'</label>'
-        +'<label class="f wide">Resultat eller note<input id="'+fid+'n" placeholder="fx 8 shuttles, 25 m pr. længde" value="'+esc(val(fid+'n',f.note||''))+'"></label></div></div>';
-    }
-  });
+/* ---------- Alternative øvelser ---------- */
+var ALTS=null;
+function altList(){
+  if(ALTS) return ALTS;
+  var a=[], seen={};
+  function add(n,kind,key){ var l=n.toLowerCase(); if(seen[l]) return; seen[l]=1; a.push({name:n,kind:kind,key:key||null}); }
+  Object.keys(MACH).forEach(function(k){ add(MACH[k],'machine',k); });
+  add('Assault bike','machine','bike'); add('Cykel','machine','bikeerg'); add('Ro-ergometer','machine','row');
+  Object.keys(LOADS).forEach(function(k){ add(LOADS[k].name,'load',k); });
+  Object.keys(SKILLS).forEach(function(k){ add(SKILLS[k].name,'skill',k); });
+  ['Burpees','Burpee over bar','Burpee box jumps','Single unders','Double unders','Air squats','Sit-ups','Push-ups','Box jumps','Step-ups (kropsvægt)','Lunges (kropsvægt)','Mountain climbers','Plank','Hollow hold','Jumping jacks','Shuttle runs'].forEach(function(n){ add(n,'free'); });
+  ALTS=a; return a;
+}
+function altResolve(name){
+  var l=String(name).trim().toLowerCase(), a=altList();
+  for(var i=0;i<a.length;i++) if(a[i].name.toLowerCase()===l) return a[i];
+  return {name:String(name).trim(),kind:'free',key:null};
+}
+function readAlt(id){
+  var nm=dv(id+'an').trim(); if(!nm) return null;
+  var r=altResolve(nm), a={name:r.name,kind:r.kind,key:r.key};
+  if(r.kind==='machine'){ a.cal=num(dv(id+'ac')); a.m=num(dv(id+'am')); a.time=dv(id+'at').trim(); }
+  else if(r.kind==='load'){ a.load=num(dv(id+'aw')); a.reps=dv(id+'ar').trim(); }
+  else if(r.kind==='skill'){ var lv=parseInt(dv(id+'al'),10); if(isFinite(lv)&&SKILLS[r.key]){ a.level=lv; a.levelName=SKILLS[r.key].ladder[lv]; } a.reps=dv(id+'ar').trim(); }
+  else { a.reps=dv(id+'ar').trim(); a.note=dv(id+'ax').trim(); }
+  return a;
+}
+function altHtml(id,saved){
+  var nm=val(id+'an',saved?saved.name:''), r=nm.trim()?altResolve(nm):null, a=(saved&&r&&saved.name===r.name)?saved:{};
+  var h='<details class="alt"'+(nm.trim()?' open':'')+'><summary>Skiftede du øvelsen?</summary><div class="log">'
+    +'<label class="f wide">Søg alternativ (valgfrit)<input id="'+id+'an" list="altlist" autocomplete="off" placeholder="fx Echo bike, SkiErg, burpees" value="'+esc(nm)+'"></label>';
+  if(r){
+    if(r.kind==='machine') h+='<label class="f">Kalorier<input id="'+id+'ac" inputmode="decimal" value="'+esc(val(id+'ac',a.cal!=null?nf(a.cal):''))+'"></label>'
+      +'<label class="f">Meter<input id="'+id+'am" inputmode="decimal" value="'+esc(val(id+'am',a.m!=null?nf(a.m):''))+'"></label>'
+      +'<label class="f">Tid (valgfri)<input id="'+id+'at" placeholder="fx 1:42" value="'+esc(val(id+'at',a.time||''))+'"></label>';
+    else if(r.kind==='load') h+='<label class="f">Vægt<input id="'+id+'aw" inputmode="decimal" value="'+esc(val(id+'aw',a.load!=null?nf(a.load):''))+'"></label>'
+      +'<label class="f">Antal reps<input id="'+id+'ar" inputmode="numeric" value="'+esc(val(id+'ar',a.reps||''))+'"></label>';
+    else if(r.kind==='skill'){
+      var sk=SKILLS[r.key], cur=val(id+'al',a.level!=null?a.level:0);
+      h+='<label class="f wide">Variant<select id="'+id+'al">'+sk.ladder.map(function(n,i){ return '<option value="'+i+'"'+(String(cur)===String(i)?' selected':'')+'>'+esc(n)+'</option>'; }).join('')+'</select></label>'
+        +'<label class="f">Antal reps<input id="'+id+'ar" inputmode="numeric" value="'+esc(val(id+'ar',a.reps||''))+'"></label>';
+    } else h+='<label class="f">Antal reps<input id="'+id+'ar" inputmode="numeric" value="'+esc(val(id+'ar',a.reps||''))+'"></label>'
+      +'<label class="f wide">Note<input id="'+id+'ax" placeholder="fx 20 cal eller 400 m" value="'+esc(val(id+'ax',a.note||''))+'"></label>';
+  }
+  return h+'</div></details>';
+}
+
+/* ---------- Log: én række pr. øvelse i hver blok ---------- */
+function itemRows(w){
+  var rows=[];
+  (w.blocks||[]).forEach(function(b,bi){ (b.items||[]).forEach(function(it,ii){
+    var ty=null;
+    if(it.type==='load'&&LOADS[it.move]) ty='load'; else if(it.type==='skill'&&SKILLS[it.skill]) ty='skill';
+    else if(it.type==='free') ty='free'; else if(it.type==='machine'&&MACH[it.machine]) ty='machine';
+    if(ty) rows.push({bi:bi,ii:ii,it:it,type:ty,id:'lg-it'+bi+'_'+ii+'-',block:b.title||''});
+  }); });
+  return rows;
+}
+function savedFor(items,r){
+  var e=items['it_'+r.bi+'_'+r.ii]; if(e) return e;
+  if(r.type==='machine') return items['mx_'+r.bi+'_'+r.ii]||null;
+  if(r.type==='free') return items['fr_'+r.bi+'_'+r.ii]||null;
+  return items['mv_'+(r.it.move||r.it.skill)]||null;
+}
+function logRow(r,ath,w,items){
+  var it=r.it, id=r.id, e=savedFor(items,r), alt=e&&e.alt?e.alt:null, h='';
+  var pl=String(it.reps==null?'':it.reps).trim();
+  var repsD=(e&&e.reps!=null&&e.reps!=='')?e.reps:(/^\d+(\.\d+)?$/.test(pl)?pl:'');
+  var N='<label class="f">Antal reps<input id="'+id+'n" inputmode="numeric" value="'+esc(val(id+'n',repsD))+'"></label>';
+  var C='<label class="f wide">Gennemført'+compSel(id+'c',val(id+'c',e&&e.comp||'full'))+'</label>';
+  var R='<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e&&e.rpe!=null?e.rpe:''))+'</label>';
+  if(r.type==='load'){
+    var def=LOADS[it.move], sc=loadFor(ath,w,it);
+    var dflt=e&&e.load!=null?nf(e.load):(sc.load!=null?nf(sc.load):(sc.plan!=null?nf(sc.plan):''));
+    h='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||def.name)+'</div><div class="hint">'+esc(def.unit)+'</div></div><div class="log">'
+      +'<label class="f">Vægt<input id="'+id+'w" inputmode="decimal" value="'+esc(val(id+'w',dflt))+'"></label>'+N+C+R+'</div>';
+  } else if(r.type==='skill'){
+    var sk=SKILLS[it.skill], sc2=gymScale(it,ath), cur=val(id+'l',e&&e.level!=null?e.level:sc2.level);
+    var lv=sk.ladder.map(function(n,i){ return '<option value="'+i+'"'+(String(cur)===String(i)?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
+    h='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||sk.name)+'</div><div class="hint">'+esc(sk.name)+'</div></div><div class="log">'
+      +'<label class="f wide">Variant du brugte<select id="'+id+'l">'+lv+'</select></label>'+N+C+R
+      +'<label class="f">Max i ét stræk<input id="'+id+'m" inputmode="numeric" placeholder="valgfri" value="'+esc(val(id+'m',e&&e.max!=null?e.max:''))+'"></label></div>';
+  } else if(r.type==='free'){
+    h='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||'Øvelse')+'</div></div><div class="log">'
+      +'<label class="f">Vægt (valgfri)<input id="'+id+'w" inputmode="decimal" value="'+esc(val(id+'w',e&&e.load!=null?nf(e.load):''))+'"></label>'+N+C+R
+      +'<label class="f wide">Resultat eller note<input id="'+id+'x" placeholder="fx 8 længder" value="'+esc(val(id+'x',e&&e.note||''))+'"></label></div>';
+  } else {
+    h='<div class="item"><div class="irow"><div class="iname">'+esc(it.label||MACH[it.machine])+'</div><div class="hint">'+esc(MACH[it.machine])+'</div></div><div class="log">'
+      +'<label class="f">Kalorier<input id="'+id+'kc" inputmode="decimal" value="'+esc(val(id+'kc',e&&e.cal!=null?nf(e.cal):''))+'"></label>'
+      +'<label class="f">Meter<input id="'+id+'km" inputmode="decimal" value="'+esc(val(id+'km',e&&e.m!=null?nf(e.m):''))+'"></label>'
+      +'<label class="f">Tid (valgfri)<input id="'+id+'kt" placeholder="fx 1:42" value="'+esc(val(id+'kt',e&&e.time||''))+'"></label></div>';
+  }
+  return h+altHtml(id,alt)+'</div>';
+}
+function mcFields(b,bi,items){
+  var e=items['mc_'+bi]||{}, id='lg-mc'+bi+'-', h='<div class="item"><div class="irow"><div class="iname">Resultat</div><div class="hint">'+esc(b.format||'')+'</div></div><div class="log">';
+  if(b.metric==='time') h+='<label class="f wide">Tid (fx 12:34)<input id="'+id+'s" value="'+esc(val(id+'s',e.score||''))+'"></label>';
+  else h+='<label class="f">Runder<input id="'+id+'d" inputmode="numeric" value="'+esc(val(id+'d',e.rounds!=null?e.rounds:''))+'"></label>'
+    +'<label class="f">+ reps<input id="'+id+'e" inputmode="numeric" value="'+esc(val(id+'e',e.extra!=null?e.extra:''))+'"></label>'
+    +'<label class="f wide">Andet resultat (valgfrit, fx kalorier eller meter)<input id="'+id+'s" value="'+esc(val(id+'s',e.rounds!=null?'':(e.score||'')))+'"></label>';
+  h+='<label class="f">Rx eller skaleret<select id="'+id+'x">'+Object.keys(MCSCALE).map(function(k){return '<option value="'+k+'"'+(val(id+'x',e.scale||'rx')===k?' selected':'')+'>'+esc(MCSCALE[k])+'</option>';}).join('')+'</select></label>'
+    +'<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e.rpe!=null?e.rpe:''))+'</label>'
+    +'<label class="f wide">Note (fx hvad du skalerede)<input id="'+id+'n" value="'+esc(val(id+'n',e.note||''))+'"></label></div></div>';
   return h;
 }
 function logPanel(w,ath){
   if(!ath||!S.db||S.canWrite===false) return '';
-  var rows=moveRows(w), d=resDoc(S.date,S.me), items=(d&&d.items)||{};
-  var h='<section class="block" id="logpanel"><div class="bhead"><span class="tag">Log</span><h2>Hvordan gik det?</h2>'
-    +'<div class="fmt muted">Udfyld det du lavede. Det er især de første logs, der lærer mig dit niveau. RPE er hvor hårdt det føltes fra 5 til 10.</div></div>';
+  var d=resDoc(S.date,S.me), items=(d&&d.items)||{}, rows=itemRows(w);
+  var h='<section class="block" id="logpanel"><datalist id="altlist">'+altList().map(function(a){return '<option value="'+esc(a.name)+'"></option>';}).join('')+'</datalist>'
+    +'<div class="bhead"><span class="tag">Log</span><h2>Hvordan gik det?</h2>'
+    +'<div class="fmt muted">Udfyld det du lavede, øvelse for øvelse. Det er især de første logs, der lærer mig dit niveau. RPE er hvor hårdt det føltes fra 5 til 10. Kunne du ikke lave en øvelse, så åbn "Skiftede du øvelsen?" og søg en anden.</div></div>';
   (w.blocks||[]).forEach(function(b,bi){
-    if(b.type!=='metcon') return;
-    var e=items['mc_'+bi]||{}, id='lg-mc'+bi+'-';
-    h+='<div class="item"><div class="irow"><div class="iname">'+(b.title&&b.title!=='Kondi'?'Kondi · '+esc(b.title):'Kondi')+'</div><div class="hint">'+esc(b.format||'')+'</div></div><div class="log">'
-      +'<label class="f wide">Resultat ('+(b.metric==='time'?'tid, fx 12:34':'fx 5+7 runder, 120 cal eller 1800 m')+')<input id="'+id+'s" value="'+esc(val(id+'s',e.score||''))+'"></label>'
-      +'<label class="f">Rx eller skaleret<select id="'+id+'x">'+Object.keys(MCSCALE).map(function(k){return '<option value="'+k+'"'+(val(id+'x',e.scale||'rx')===k?' selected':'')+'>'+esc(MCSCALE[k])+'</option>';}).join('')+'</select></label>'
-      +'<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e.rpe!=null?e.rpe:''))+'</label>'
-      +'<label class="f wide">Hvad du skalerede, vægte du brugte og andet<input id="'+id+'n" placeholder="fx 15 kg DB, singles i stedet for double unders" value="'+esc(val(id+'n',e.note||''))+'"></label></div></div>';
-    h+=extraRows(b,bi,items);
-  });
-  (w.blocks||[]).forEach(function(b,bi){ if(b.type!=='metcon') h+=extraRows(b,bi,items); });
-  rows.forEach(function(r){
-    var e=items['mv_'+r.key]||{}, id='lg-'+r.id+'-';
-    if(r.type==='load'){
-      var def=LOADS[r.key], sc=loadFor(ath,w,r.item);
-      var dflt = e.load!=null ? nf(e.load) : (sc.load!=null?nf(sc.load):(sc.plan!=null?nf(sc.plan):''));
-      h+='<div class="item"><div class="irow"><div class="iname">'+esc(def.name)+'</div><div class="hint">'+esc(def.unit)+'</div></div><div class="log">'
-        +'<label class="f">Vægt<input id="'+id+'w" inputmode="decimal" value="'+esc(val(id+'w',dflt))+'"></label>'
-        +'<label class="f wide">Gennemført'+compSel(id+'c',val(id+'c',e.comp||'full'))+'</label>'
-        +'<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e.rpe!=null?e.rpe:''))+'</label></div></div>';
-    } else {
-      var sk=SKILLS[r.key], sc2=gymScale(r.item,ath), cur=val(id+'l',e.level!=null?e.level:sc2.level);
-      var lv=sk.ladder.map(function(n,i){ return '<option value="'+i+'"'+(String(cur)===String(i)?' selected':'')+'>'+esc(n)+'</option>'; }).join('');
-      h+='<div class="item"><div class="irow"><div class="iname">'+esc(sk.name)+'</div><div class="hint">'+esc(r.labels.filter(Boolean).join(', '))+'</div></div><div class="log">'
-        +'<label class="f wide">Variant du brugte<select id="'+id+'l">'+lv+'</select></label>'
-        +'<label class="f wide">Gennemført'+compSel(id+'c',val(id+'c',e.comp||'full'))+'</label>'
-        +'<label class="f">Max i ét stræk<input id="'+id+'m" inputmode="numeric" placeholder="valgfri" value="'+esc(val(id+'m',e.max!=null?e.max:''))+'"></label>'
-        +'<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e.rpe!=null?e.rpe:''))+'</label></div></div>';
-    }
+    var br=rows.filter(function(r){return r.bi===bi;}), mc=b.type==='metcon';
+    if(!mc&&!br.length) return;
+    h+='<div class="item head">'+esc((b.title||TYPES[b.type]||'')+(b.format?' · '+b.format:''))+'</div>';
+    if(mc) h+=mcFields(b,bi,items);
+    br.forEach(function(r){ h+=logRow(r,ath,w,items); });
   });
   var o=items.overall||{};
   h+='<div class="blocklog"><div class="log">'
-    +'<label class="f wide">Samlet resultat (tid, runder eller reps)<input id="lg-o-score" value="'+esc(val('lg-o-score',o.score||''))+'"></label>'
+    +'<label class="f wide">Samlet resultat (valgfrit)<input id="lg-o-score" value="'+esc(val('lg-o-score',o.score||''))+'"></label>'
     +'<label class="f">Samlet RPE'+rpeSel('lg-o-rpe',val('lg-o-rpe',o.rpe!=null?o.rpe:''))+'</label>'
     +'<label class="f wide">Note (valgfri)<input id="lg-o-note" placeholder="fx skulder mod slut" value="'+esc(val('lg-o-note',o.note||''))+'"></label></div>'
     +'<div class="row"><button class="btn" data-act="save-log">Gem log</button></div>'
     +'<div class="hint">Gemmer du igen, rettes loggen, men din arbejdsvægt og dit niveau justeres kun første gang.</div>'
-    +(Object.keys(items).length?'<div class="saved">Gemt: '+esc(Object.keys(items).filter(function(k){return k!=='overall';}).map(function(k){return fmtEntry(items[k]);}).join(' | '))+'</div>':'')
+    +(entryKeys(items,false).length?'<div class="saved">Gemt: '+esc(entryKeys(items,false).map(function(k){return fmtEntry(items[k]);}).join(' | '))+'</div>':'')
     +'</div></section>';
   return h;
 }
@@ -772,7 +851,7 @@ function teamTab(){
   if(!list.length) return h+'<div class="notice"><p class="muted">Ingen atleter endnu.</p></div>';
   h+='<section class="sec"><h2>Dagens resultater</h2><div style="display:flex;flex-direction:column;gap:10px">';
   list.forEach(function(x){
-    var d=resDoc(S.date,x.id), items=d&&d.items?Object.keys(d.items).sort().map(function(k){return d.items[k];}):[];
+    var d=resDoc(S.date,x.id), items=d&&d.items?entryKeys(d.items,true).map(function(k){return d.items[k];}):[];
     h+='<div class="athcard"><h3>'+esc(x.a.name)+'</h3>'+(items.length?'<ul>'+items.map(function(e){return '<li>'+esc(fmtEntry(e))+'</li>';}).join('')+'</ul>':'<span class="muted">Intet logget endnu</span>')+'</div>';
   });
   h+='</div></section>';
@@ -807,7 +886,7 @@ function profileTab(){
     +CATS.map(function(c){return '<li><b>'+esc(c.label)+'</b> ('+esc(c.desc)+'): '+c.parts.map(function(p){return p[0]==='l'?LOADS[p[1]].name+' ('+LOADS[p[1]].ref+' kg)':p[0]==='m'?'din placering på holdets '+(p[1]==='cardio'?'cardio-kondier':'kondier')+' (de seneste 8)':p[0]==='v'?SKILLS[p[1]].name+' ('+VREF[p[1]]+' reps)':SKILLS[p[1]].name;}).join(', ')+'</li>';}).join('')+'</ul></details></section>';
 
   var mc=[];
-  Object.keys(S.results).forEach(function(k){ var r=S.results[k]; if(r.athleteId!==S.me||!r.items) return; Object.keys(r.items).forEach(function(ik){ if(r.items[ik].kind==='metcon'||r.items[ik].kind==='machine') mc.push({date:r.date,e:r.items[ik]}); }); });
+  Object.keys(S.results).forEach(function(k){ var r=S.results[k]; if(r.athleteId!==S.me||!r.items) return; Object.keys(r.items).forEach(function(ik){ if((r.items[ik].kind==='metcon'||r.items[ik].kind==='machine')&&!r.items[ik].derived&&!r.items[ik].alt) mc.push({date:r.date,e:r.items[ik]}); }); });
   mc.sort(function(x,y){return y.date.localeCompare(x.date);});
   if(mc.length) h+='<section class="sec"><h2>Kondi</h2><p class="muted small">Dine seneste kondi-resultater.</p><div style="display:flex;flex-direction:column;gap:6px">'
     +mc.slice(0,14).map(function(m){ return '<div class="athcard"><b>'+esc(shortLabel(m.date))+'</b><span>'+esc(fmtEntry(m.e))+'</span></div>'; }).join('')+'</div></section>';
@@ -900,7 +979,7 @@ function buildStatus(){
     recent.forEach(function(d){
       var r=resDoc(d,x.id); if(!r||!r.items) return;
       out.push('Resultater '+d+':');
-      Object.keys(r.items).sort().forEach(function(k){ out.push('- '+fmtEntry(r.items[k])); });
+      entryKeys(r.items,true).forEach(function(k){ out.push('- '+fmtEntry(r.items[k])); });
     });
     out.push('');
   });
@@ -961,55 +1040,78 @@ function prune(o){
 }
 async function saveLog(){
   var w=S.workouts[S.date], ath=myAth(); if(!w||!ath) return;
-  var rows=moveRows(w), existing=(resDoc(S.date,S.me)||{}).items||{};
-  var items={}, patch={w:{},n:{},pr:{},prd:{},skills:{}}, msgs=[], bad=null;
+  var existing=(resDoc(S.date,S.me)||{}).items||{}, rows=itemRows(w);
+  var items={}, patch={w:{},n:{},pr:{},prd:{},skills:{}}, msgs=[], bad=null, groups={};
   rows.forEach(function(r){
     if(bad) return;
-    var id='lg-'+r.id+'-', comp=dv(id+'c')||'full', rpe=num(dv(id+'r')), first=!existing['mv_'+r.key];
+    var it=r.it, id=r.id, alt=readAlt(id), comp=dv(id+'c')||'full', rpe=num(dv(id+'r')), reps=dv(id+'n').trim();
+    var key='it_'+r.bi+'_'+r.ii, base={label:it.label||'',block:r.block,ts:Date.now()}, e=null;
     if(r.type==='load'){
-      var raw=dv(id+'w').trim(); if(raw==='') return;
-      var L=num(raw); if(L==null||L<0){ bad='Vægten for '+LOADS[r.key].name+' skal være et tal.'; return; }
-      var def=LOADS[r.key], pct=num(r.item.pct)||100;
-      items['mv_'+r.key]={kind:'load',move:r.key,name:def.name,unit:def.unit,load:L,comp:comp,rpe:rpe,pct:pct,ts:Date.now()};
+      var def=LOADS[it.move], raw=dv(id+'w').trim(), L=null;
+      if(raw===''&&!alt) return;
+      if(raw!==''){ L=num(raw); if(L==null||L<0){ bad='Vægten for '+def.name+' skal være et tal.'; return; } }
+      var pct=num(it.pct)||100;
+      e=Object.assign({kind:'load',move:it.move,name:def.name,unit:def.unit,load:L,reps:reps,comp:comp,rpe:rpe,pct:pct},base);
+      if(!alt&&L!=null){ var g='load_'+it.move; (groups[g]=groups[g]||{type:'load',key:it.move,c:[]}).c.push({L:L,pct:pct,comp:comp,rpe:rpe,imp:L*100/pct}); }
+    } else if(r.type==='skill'){
+      var sk=SKILLS[it.skill], lvl=parseInt(dv(id+'l'),10), mx=num(dv(id+'m'));
+      if(!isFinite(lvl)&&!alt) return;
+      e=Object.assign({kind:'skill',skill:it.skill,name:sk.name,level:isFinite(lvl)?lvl:null,levelName:isFinite(lvl)?sk.ladder[lvl]:'',reps:reps,comp:comp,rpe:rpe,max:mx},base);
+      if(!alt&&isFinite(lvl)){ var g2='skill_'+it.skill; (groups[g2]=groups[g2]||{type:'skill',key:it.skill,c:[]}).c.push({level:lvl,comp:comp,rpe:rpe,mx:mx}); }
+    } else if(r.type==='free'){
+      var fw=dv(id+'w').trim(), fn=dv(id+'x').trim();
+      if(!alt&&fw===''&&!fn&&!reps&&rpe==null) return;
+      if(fw!==''&&num(fw)==null){ bad='Vægten for '+(it.label||'øvelsen')+' skal være et tal.'; return; }
+      e=Object.assign({kind:'free',name:it.label||'Øvelse',load:fw===''?null:num(fw),reps:reps,comp:comp,rpe:rpe,note:fn},base);
+    } else {
+      var cal=num(dv(id+'kc')), mt=num(dv(id+'km')), tm=dv(id+'kt').trim();
+      if(!alt&&cal==null&&mt==null&&!tm) return;
+      e=Object.assign({kind:'machine',machine:it.machine,name:it.label||MACH[it.machine],cal:cal,m:mt,time:tm},base);
+    }
+    if(alt) e.alt=alt;
+    items[key]=e;
+  });
+  if(bad){ toast(bad,true); return; }
+  /* Læring: én samlet opdatering pr. bevægelse, ud fra den sværeste variant eller tungeste vægt */
+  Object.keys(groups).forEach(function(gk){
+    var g=groups[gk], rk=g.key, first=!existing['mv_'+rk], best=g.c[0];
+    g.c.forEach(function(c){ if(g.type==='load'?c.imp>best.imp:c.level>best.level) best=c; });
+    if(g.type==='load'){
+      var def=LOADS[rk], L=best.L, pct=best.pct, comp=best.comp, rpe=best.rpe;
+      var ent={kind:'load',move:rk,name:def.name,unit:def.unit,load:L,comp:comp,rpe:rpe,pct:pct,derived:true,ts:Date.now()};
+      items['mv_'+rk]=ent;
       if(first){
-        var n=(ath.n&&ath.n[r.key])||0, w0=workWeight(ath,r.key);
+        var n=(ath.n&&ath.n[rk])||0, w0=workWeight(ath,rk);
         var nw=nextW(def,w0,n,L,pct,comp,rpe);
-        patch.w[r.key]=nw; patch.n[r.key]=n+1;
-        items['mv_'+r.key].wAfter=nw;
+        patch.w[rk]=nw; patch.n[rk]=n+1; ent.wAfter=nw;
         if(w0!=null && nw!==w0) msgs.push(def.name+': arbejdsvægt '+nf(w0)+' → '+nf(nw));
         else if(w0==null) msgs.push(def.name+': arbejdsvægt sat til '+nf(nw));
-        var pr=gpr(ath,r.key);
+        var pr=gpr(ath,rk);
         if(comp==='full' && L>0 && (!def.bar||pct>=100) && (pr==null||L>pr)){
-          patch.pr[r.key]=L; patch.prd[r.key]=S.date; items['mv_'+r.key].newPR=true;
+          patch.pr[rk]=L; patch.prd[rk]=S.date; ent.newPR=true;
           msgs.push(pr==null?def.name+': PR sat til '+nf(L):'Ny PR i '+def.name+': '+nf(L));
         }
       }
     } else {
-      var sk=SKILLS[r.key], lvl=parseInt(dv(id+'l'),10), mx=num(dv(id+'m'));
-      if(!isFinite(lvl)) return;
-      items['mv_'+r.key]={kind:'skill',skill:r.key,name:sk.name,level:lvl,levelName:sk.ladder[lvl],comp:comp,rpe:rpe,max:mx,ts:Date.now()};
+      var sk=SKILLS[rk], mxx=null;
+      g.c.forEach(function(c){ if(c.mx!=null&&(mxx==null||c.mx>mxx)) mxx=c.mx; });
+      items['mv_'+rk]={kind:'skill',skill:rk,name:sk.name,level:best.level,levelName:sk.ladder[best.level],comp:best.comp,rpe:best.rpe,max:mxx,derived:true,ts:Date.now()};
       if(first){
-        var old=gsk(ath,r.key), ns=nextSkill(old,lvl,comp,rpe,mx);
-        patch.skills[r.key]=ns;
+        var old=gsk(ath,rk), ns=nextSkill(old,best.level,best.comp,best.rpe,mxx);
+        patch.skills[rk]=ns;
         if(!old||ns.level!==old.level) msgs.push(sk.name+': niveau '+sk.ladder[ns.level]);
       }
     }
   });
   (w.blocks||[]).forEach(function(b,bi){
-    if(b.type==='metcon'){
-      var id='lg-mc'+bi+'-', sc=dv(id+'s').trim(), nt=dv(id+'n').trim(), rp=num(dv(id+'r'));
-      if(sc||nt||rp!=null) items['mc_'+bi]={kind:'metcon',title:b.title||'',score:sc,scale:dv(id+'x')||'rx',rpe:rp,note:nt,ts:Date.now()};
+    if(b.type!=='metcon') return;
+    var id='lg-mc'+bi+'-', nt=dv(id+'n').trim(), rp=num(dv(id+'r')), sc=dv(id+'s').trim(), rdv=dv(id+'d').trim(), rev=dv(id+'e').trim(), score=sc, rounds=null, extra=null;
+    if(rdv!==''){
+      rounds=num(rdv); extra=rev===''?0:num(rev);
+      if(rounds==null||extra==null){ bad='Runder og reps skal være tal.'; return; }
+      score=rounds+'+'+extra;
     }
-    (b.items||[]).forEach(function(it,ii){
-      if(it.type==='machine'){
-        var mid='lg-mx'+bi+'_'+ii+'-', cal=num(dv(mid+'c')), mt=num(dv(mid+'m')), tm=dv(mid+'t').trim();
-        if(cal!=null||mt!=null||tm) items['mx_'+bi+'_'+ii]={kind:'machine',machine:it.machine,name:it.label||MACH[it.machine],cal:cal,m:mt,time:tm,ts:Date.now()};
-      } else if(it.type==='free'){
-        var fid='lg-fr'+bi+'_'+ii+'-', fw=dv(fid+'w').trim(), fn=dv(fid+'n').trim(), fr=num(dv(fid+'r'));
-        if(fw!==''&&num(fw)==null){ bad='Vægten for '+(it.label||'øvelsen')+' skal være et tal.'; return; }
-        if(fw||fn||fr!=null) items['fr_'+bi+'_'+ii]={kind:'free',name:it.label||'Øvelse',load:fw===''?null:num(fw),comp:dv(fid+'c')||'full',rpe:fr,note:fn,ts:Date.now()};
-      }
-    });
+    if(score||nt||rp!=null) items['mc_'+bi]={kind:'metcon',title:b.title||'',score:score,rounds:rounds,extra:extra,scale:dv(id+'x')||'rx',rpe:rp,note:nt,ts:Date.now()};
   });
   if(bad){ toast(bad,true); return; }
   var os=dv('lg-o-score').trim(), orpe=num(dv('lg-o-rpe')), on=dv('lg-o-note').trim();
@@ -1387,6 +1489,7 @@ document.addEventListener('change',function(ev){
   if(edFromEl(t,true)) return;
   if(t.id) S.fields[t.id]=t.value;
   if(t.id==='who'){ S.me=t.value||null; lsSet('tl-me',S.me||''); S.fields={}; render(); }
+  else if(/-an$/.test(t.id)){ render(); }
   else if(t.id==='dsel' && t.value){ S.date=t.value; S.dateTouched=true; S.fields={}; render(); }
 });
 document.addEventListener('focusout',function(){
