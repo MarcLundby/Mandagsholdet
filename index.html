@@ -276,7 +276,7 @@ var LOADS = {
 var SKILLS = {
   pullup:{name:'Pull-ups', ladder:['Ring rows','Pull-up med elastik','Strict pull-up','Kipping pull-up','Chest-to-bar']},
   lsit:{name:'L-sit', ladder:['Tuck hold','One-leg L-sit','L-sit','L-sit til V-sit']},
-  hspu:{name:'Håndstandspush-ups', ladder:['Pike push-up på kasse','HSPU med abmat','Chest-to-wall HSPU','Strict HSPU','Deficit strict HSPU']},
+  hspu:{name:'Håndstandspush-ups', ladder:['Pike push-up på kasse','HSPU med abmat','Chest-to-wall HSPU','Strict HSPU','Kipping deficit HSPU','Deficit strict HSPU']},
   ttb:{name:'Toes-to-bar', ladder:['Hanging knee raise','Knees-to-elbows','Strict toes-to-bar','Kipping toes-to-bar']},
   rope:{name:'Rope climbs', ladder:['Rope pull fra gulv','Rope climb med ben','Rope climb','Legless rope climb']},
   muscleup:{name:'Muscle-ups (BMU/RMU)', ladder:['Jumping MU-drill','Ring MU med elastik','Bar muscle-up','Ring muscle-up']},
@@ -344,7 +344,7 @@ var Q=Promise.resolve();
 function enqueue(fn){ var p=Q.then(fn); Q=p.catch(function(){}); return p; }
 
 function athleteList(){
-  return Object.keys(S.athletes).map(function(id){ return {id:id,a:S.athletes[id]}; })
+  return Object.keys(S.athletes).filter(function(id){ return id.indexOf('__')!==0; }).map(function(id){ return {id:id,a:S.athletes[id]}; })
     .sort(function(x,y){ return (x.a.order||0)-(y.a.order||0) || String(x.a.name).localeCompare(String(y.a.name)); });
 }
 function resDoc(date,id){ return S.results[date+'_'+id]; }
@@ -1000,7 +1000,7 @@ function buildPrompt(raw){
    +'Vægtbevægelser:\n'+loads+'\nStangløft (kan bruges som load): '+bars+'\n\nGymnastik (nøgle = navn: indeks:variant, nemmest først):\n'+skills+'\n\n'
    +'Regler:\n- Bevar rækkefølgen. Runder og format skrives i blokkens format. Items er det, der laves i hver runde.\n'
    +'- Sandbag cleans, shouldering og reverse lunges bruger alle move "sandbag". Farmer carry bruger "farmer". Weighted pull-ups bruger "wpullup".\n'
-   +'- HSPU: strict = level 3, chest-to-wall = level 2, deficit = level 4. TTB = level 3. Rope climbs = level 2. BMU/RMU = level 2.\n'
+   +'- HSPU: strict = level 3, chest-to-wall = level 2, kipping deficit = level 4, deficit strict = level 5. TTB = level 3. Rope climbs = level 2. BMU/RMU = level 2.\n'
    +'- Står der faste vægte pr. person, læg dem i plan (nøgle = bevægelsen).\n'
    +'- Bevægelser uden nøgle (løb, rower, wall balls osv.) bliver type other.\n- Opfind ikke noget, der ikke står i teksten.\n\nProgram:\n'+raw;
 }
@@ -1305,7 +1305,11 @@ function detectItem(l){
     var d=DETECT[i];
     if(d[2].test(low)&&(!d[3]||d[3].test(low))){
       if(d[0]==='load'&&LOADS[d[1]]) return {type:'load',move:d[1],label:l,reps:reps,pct:100,note:''};
-      if(d[0]==='skill'&&SKILLS[d[1]]) return {type:'skill',skill:d[1],label:l,reps:reps,level:null,note:''};
+      if(d[0]==='skill'&&SKILLS[d[1]]){
+        var lv=null;
+        if(d[1]==='hspu'){ if(/deficit/.test(low)) lv=/kipping/.test(low)?4:5; else if(/strict/.test(low)) lv=3; else if(/chest|c2w|ctw/.test(low)) lv=2; else if(/abmat/.test(low)) lv=1; }
+        return {type:'skill',skill:d[1],label:l,reps:reps,level:lv,note:''};
+      }
     }
   }
   return {type:'free',label:l,reps:reps,note:''};
@@ -1324,31 +1328,34 @@ function parseKondiText(txt){
   return items;
 }
 function kondiForm(w){
-  var has=w&&(w.blocks||[]).some(function(b){return b.type==='metcon';});
-  var h='<section class="sec"><h2>Ugens kondi</h2><p class="muted small">Indsæt kondien for '+esc(dayLabel(S.date))+' (datoen øverst). '
+  var ktype=val('k-type','metcon'), isMc=ktype==='metcon';
+  var has=isMc&&w&&(w.blocks||[]).some(function(b){return b.type==='metcon';});
+  var h='<section class="sec"><h2>Ugens kondi og ekstra blokke</h2><p class="muted small">Indsæt kondien eller en ekstra blok for '+esc(dayLabel(S.date))+' (datoen øverst). '
     +(has?'Der ligger allerede en kondi på dagen. "Erstat kondi" skifter den første ud (gemte resultater bevares), og "Tilføj som ekstra kondi" lægger en ny efter de andre.':(w?'Den lægges først i dagens pas, før styrkedelen.':'Der ligger intet pas på dagen endnu. Der laves et pas kun med kondi.'))+'</p>'
     +'<div class="g2"><label class="f">Titel<input id="k-title" value="'+esc(val('k-title','Kondi'))+'"></label>'
     +'<label class="f">Format<input id="k-format" placeholder="fx AMRAP 15 min" value="'+esc(val('k-format',''))+'"></label></div>'
-    +'<div class="g2"><label class="f">Slags kondi<select id="k-mode">'+edOpts(MCMODE,val('k-mode','mix'))+'</select></label>'
-    +'<label class="f">Resultat måles som<select id="k-metric">'+edOpts(MCMETRIC,val('k-metric','reps'))+'</select></label></div>'
+    +'<label class="f">Blok-type<select id="k-type"><option value="metcon"'+(isMc?' selected':'')+'>Kondi</option><option value="strength"'+(ktype==='strength'?' selected':'')+'>Styrke</option><option value="gym"'+(ktype==='gym'?' selected':'')+'>Gymnastik</option></select></label>'
+    +(isMc?'<div class="g2"><label class="f">Slags kondi<select id="k-mode">'+edOpts(MCMODE,val('k-mode','mix'))+'</select></label>'
+    +'<label class="f">Resultat måles som<select id="k-metric">'+edOpts(MCMETRIC,val('k-metric','reps'))+'</select></label></div>':'')
     +'<label class="f">Kondi-workout, én linje pr. del<textarea id="k-text" placeholder="# Del 1&#10;@row 5 x 500 m, 2 min hvile&#10;10 shuttle runs&#10;12 DB S2OH" style="min-height:150px">'+esc(val('k-text',''))+'</textarea></label>'
     +'<p class="hint">Skriv en linje for hvert led. Start en linje med <b>@row</b>, <b>@bike</b> (Echo bike), <b>@ski</b>, <b>@bikeerg</b> eller <b>@run</b>, så kan holdet logge kalorier og meter på den. Start med <b>#</b> for en overskrift. Kendte øvelser (DB S2OH, thrusters, sled push, BMU, pull-ups osv.) genkendes og logges med vægt og skalering som resten af programmet. Øvrige linjer logges som øvelser med vægt, gennemført og RPE. Start en linje med <b>~</b>, hvis den kun er tekst (fx hvile). <b>Højeste tal</b> bruges til runder + reps, kalorier eller meter, <b>Laveste tid</b> til workouts på tid.</p>'
     +'<div class="row">'+Object.keys(MACH).map(function(k){return '<button class="btn ghost sm" data-act="k-add" data-k="'+k+'">+ '+esc(MACH[k])+'</button>';}).join('')+'</div>'
-    +'<div class="row"><button class="btn" data-act="k-save">'+(has?'Erstat kondi':'Læg kondi ind')+'</button>'
+    +'<div class="row"><button class="btn" data-act="k-save">'+(!isMc?'Tilføj blok til passet':has?'Erstat kondi':'Læg kondi ind')+'</button>'
     +(has?'<button class="btn ghost" data-act="k-add-block">Tilføj som ekstra kondi</button>':'')+'</div>'
     +(has?'<p class="hint">Er der flere kondier samme dag (fx to AMRAPs), så tilføj dem som ekstra kondi. Hver får sit eget resultatfelt og sin egen log.</p>':'')+'</section>';
   return h;
 }
 async function kondiSave(add){
   var txt=val('k-text','').trim(); if(!txt){ toast('Skriv kondien først.',true); return; }
-  var blk={title:val('k-title','Kondi').trim()||'Kondi',type:'metcon',format:val('k-format','').trim(),notes:'',
-    metric:val('k-metric','reps'),mode:val('k-mode','mix'),items:parseKondiText(txt)};
+  var kt=val('k-type','metcon'); if(!TYPES[kt]) kt='metcon';
+  var blk={title:val('k-title','Kondi').trim()||(kt==='metcon'?'Kondi':TYPES[kt]),type:kt,format:val('k-format','').trim(),notes:'',items:parseKondiText(txt)};
+  if(kt==='metcon'){ blk.metric=val('k-metric','reps'); blk.mode=val('k-mode','mix'); }
   var old=S.workouts[S.date], doc;
   if(old){
     doc=clean(old); delete doc.updatedAt;
     var bl=Array.isArray(doc.blocks)?doc.blocks:[], ix=-1;
     bl.forEach(function(b,i){ if(b.type==='metcon'){ if(add) ix=i; else if(ix<0) ix=i; } });
-    if(add) bl.splice(ix>=0?ix+1:0,0,blk); else if(ix>=0) bl[ix]=blk; else bl.unshift(blk);
+    if(kt!=='metcon') bl.push(blk); else if(add) bl.splice(ix>=0?ix+1:0,0,blk); else if(ix>=0) bl[ix]=blk; else bl.unshift(blk);
     doc.blocks=bl;
   } else doc={title:'Kondi',blocks:[blk],draft:false};
   var n=normProgram(doc); if(n.err){ toast(n.err,true); return; }
@@ -1356,8 +1363,8 @@ async function kondiSave(add){
   if(typeof out.draft!=='boolean') out.draft=false;
   try{
     await enqueue(function(){ return S.db.doc('workouts/'+S.date).set(clean(out)); });
-    delete S.fields['k-text']; delete S.fields['k-format']; delete S.fields['k-title'];
-    toast('Kondien er lagt ind.'); render();
+    delete S.fields['k-text']; delete S.fields['k-format']; delete S.fields['k-title']; S.fields['k-type']='metcon';
+    toast(kt==='metcon'?'Kondien er lagt ind.':'Blokken er tilføjet.'); render();
   }catch(e){ toast(errMsg(e),true); }
 }
 async function parseProgram(){
@@ -1383,12 +1390,61 @@ async function saveProgram(){
   try{ await enqueue(function(){ return S.db.doc('workouts/'+S.date).set(clean(doc)); }); S.coach.msg=''; S.coach.warn=n.warn; S.fields['c-json']=''; toast('Program gemt til '+S.date+'.'); S.tab='today'; render(); }
   catch(e){ toast(errMsg(e),true); }
 }
+
+/* ---------- Engangs-opdatering: HSPU-stigen fik et nyt trin (Kipping deficit HSPU) mellem Strict og Deficit strict ---------- */
+function hspuFixBlocks(blocks){
+  var ch=false;
+  (blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){
+    if(it&&it.type==='skill'&&it.skill==='hspu'&&Number.isInteger(it.level)&&it.level>=4){ it.level++; ch=true; }
+  }); });
+  return ch;
+}
+function dotted(up){
+  var o={};
+  Object.keys(up).forEach(function(k){ var u=up[k];
+    if(u.level!==undefined){ o['items.'+k+'.level']=u.level; o['items.'+k+'.levelName']=u.levelName; }
+    if(u.alt){ o['items.'+k+'.alt.level']=u.alt.level; o['items.'+k+'.alt.levelName']=u.alt.levelName; }
+  });
+  return o;
+}
+function hspuFixItems(items){
+  var upd={};
+  Object.keys(items||{}).forEach(function(k){
+    var e=items[k], u=null; if(!e) return;
+    if(e.kind==='skill'&&e.skill==='hspu'&&Number.isInteger(e.level)&&e.level>=4){ u={level:e.level+1,levelName:SKILLS.hspu.ladder[e.level+1]}; }
+    if(e.alt&&e.alt.kind==='skill'&&e.alt.key==='hspu'&&Number.isInteger(e.alt.level)&&e.alt.level>=4){ u=u||{}; u.alt={level:e.alt.level+1,levelName:SKILLS.hspu.ladder[e.alt.level+1]}; }
+    if(u) upd[k]=u;
+  });
+  return upd;
+}
+async function migrateHspu(){
+  var ws=await S.db.collection('workouts').get();
+  for(var i=0;i<ws.docs.length;i++){ var wd=ws.docs[i], w=wd.data(); if(hspuFixBlocks(w.blocks)){ await (function(id,b){ return enqueue(function(){ return S.db.doc('workouts/'+id).update({blocks:b}); }); })(wd.id,w.blocks); } }
+  var as=await S.db.collection('athletes').get();
+  for(var j=0;j<as.docs.length;j++){ var ad=as.docs[j], a=ad.data(), st=a&&a.skills&&a.skills.hspu; if(st&&Number.isInteger(st.level)&&st.level>=4){ await (function(id,l){ return enqueue(function(){ return S.db.doc('athletes/'+id).update({'skills.hspu.level':l}); }); })(ad.id,st.level+1); } }
+  var rs=await S.db.collection('results').get();
+  for(var k=0;k<rs.docs.length;k++){ var rd=rs.docs[k], r=rd.data(), up=hspuFixItems(r.items); if(Object.keys(up).length){ await (function(id,u){ return enqueue(function(){ return S.db.doc('results/'+id).update(u); }); })(rd.id,dotted(up)); } }
+  await enqueue(function(){ return S.db.doc('athletes/__meta').set({name:'__meta',hspuV:2}); });
+}
+function maybeMigrate(){
+  if(!window.coachAuth||!S.canCoach||!S.db||S.migBusy||!S.loaded.a) return;
+  var m=S.athletes.__meta; if(m&&m.hspuV>=2) return;
+  S.migBusy=true; toast('Opdaterer HSPU-trin i gamle data…');
+  migrateHspu().then(function(){ toast('HSPU-trin er opdateret.'); }).catch(function(e){ S.migBusy=false; toast(errMsg(e),true); });
+}
 async function importSeed(){
   var sd=window.SEED||{}; S.confirm=null; var n=0;
   try{
     ['athletes','workouts','results'].forEach(function(col){
-      Object.keys(sd[col]||{}).forEach(function(id){ n++; enqueue(function(){ return S.db.doc(col+'/'+id).set(clean(sd[col][id])); }); });
+      Object.keys(sd[col]||{}).forEach(function(id){
+        n++; var d=clean(sd[col][id]);
+        if(col==='workouts') hspuFixBlocks(d.blocks);
+        else if(col==='athletes'){ var hs=d.skills&&d.skills.hspu; if(hs&&Number.isInteger(hs.level)&&hs.level>=4) hs.level++; }
+        else if(col==='results'){ var up=hspuFixItems(d.items); Object.keys(up).forEach(function(k2){ Object.assign(d.items[k2],up[k2]); if(up[k2].alt) d.items[k2].alt=Object.assign({},d.items[k2].alt,up[k2].alt); }); }
+        enqueue(function(){ return S.db.doc(col+'/'+id).set(d); });
+      });
     });
+    await enqueue(function(){ return S.db.doc('athletes/__meta').set({name:'__meta',hspuV:2}); });
     await Q; toast(n+' dokumenter er importeret.');
   }catch(e){ toast(errMsg(e),true); }
 }
@@ -1489,7 +1545,7 @@ document.addEventListener('change',function(ev){
   if(edFromEl(t,true)) return;
   if(t.id) S.fields[t.id]=t.value;
   if(t.id==='who'){ S.me=t.value||null; lsSet('tl-me',S.me||''); S.fields={}; render(); }
-  else if(/-an$/.test(t.id)){ render(); }
+  else if(/-an$/.test(t.id)||t.id==='k-type'){ render(); }
   else if(t.id==='dsel' && t.value){ S.date=t.value; S.dateTouched=true; S.fields={}; render(); }
 });
 document.addEventListener('focusout',function(){
@@ -1526,7 +1582,7 @@ async function init(){
   if(!S.db){ render(); return; }
   var mkErr=function(w){ return function(e){ S.err='Kunne ikke hente data ('+(e&&e.code||'fejl')+') – '+w+'.'; schedule(); }; };
   S.db.collection('athletes').onSnapshot(function(snap){
-    var o={}; snap.docs.forEach(function(d){ var v=d.data(); v.__id=d.id; o[d.id]=v; }); S.athletes=o; S.loaded.a=true; ensureMe(); schedule();
+    var o={}; snap.docs.forEach(function(d){ var v=d.data(); v.__id=d.id; o[d.id]=v; }); S.athletes=o; S.loaded.a=true; ensureMe(); maybeMigrate(); schedule();
   },mkErr('athletes'));
   var unsubW=null;
   function subWorkouts(){
@@ -1541,6 +1597,7 @@ async function init(){
   if(window.coachAuth) window.coachAuth.onChange=function(isCoach){
     if(isCoach===S.canCoach) return;
     S.canCoach=isCoach; S.confirm=null; S.fields={};
+    if(isCoach) maybeMigrate();
     if(!isCoach&&(S.tab==='coach')) S.tab='today';
     subWorkouts(); render();
   };
