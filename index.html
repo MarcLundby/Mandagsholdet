@@ -81,6 +81,15 @@ label.f input,label.f select{text-transform:none;letter-spacing:0;color:var(--in
 .notice.warn{border-color:var(--warn)}
 .notice h3{font-size:20px;margin-bottom:4px}
 .notice p{margin:4px 0 0}
+.hrsvg{width:100%;height:auto;display:block}
+.zrow{display:grid;grid-template-columns:78px 1fr 64px;gap:8px;align-items:center;font-size:13px;margin:5px 0}
+.zbar{height:12px;background:var(--chip);border-radius:3px;overflow:hidden}
+.zbar i{display:block;height:100%}
+.zstat{display:flex;gap:18px;flex-wrap:wrap;margin:6px 0 10px}
+.zstat b{font-size:22px;display:block;font-family:var(--disp,inherit)}
+.stcard{border:1px solid var(--accent);background:var(--accent-soft);border-radius:8px;padding:14px 16px;margin:10px 0}
+.stcard h3{font-size:18px;margin-bottom:2px}
+
 
 .block{background:var(--surface);border:1px solid var(--line);border-radius:10px;overflow:hidden}
 .bhead{padding:14px 16px 10px;display:flex;flex-direction:column;gap:2px}
@@ -172,6 +181,7 @@ details p,details li{font-size:13px;color:var(--mute)}
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
 <script src="firebase-config.js"></script>
 <script src="seed.js"></script>
+<script src="strava-config.js"></script>
 <script>
 (function(){
   var cfg=window.FIREBASE_CONFIG, coachEmail=String(window.COACH_EMAIL||'').toLowerCase();
@@ -308,7 +318,7 @@ var CATS = [
   {key:'kondi',label:'Kondi',desc:'Kondi med vægte og gymnastik',parts:[['m','mix']]}
 ];
 
-var S = {
+var S = {st:{acts:[],err:'',busy:false,auto:false},
   db:null, user:null, sample:null, canCoach:false, canWrite:null, noRuntime:false,
   athletes:{}, workouts:{}, results:{}, loaded:{a:false,w:false,r:false}, err:'',
   me:null, date:today(), dateTouched:false, tab:'today', fields:{}, confirm:null,
@@ -603,7 +613,7 @@ function nextWorkoutDate(){
 }
 
 function todayTab(){
-  var h=dateBar();
+  var h=dateBar()+stravaPrompt();
   var list=athleteList();
   if(!S.loaded.a||!S.loaded.w) return h+'<p class="muted">Henter program…</p>';
   if(!list.length){
@@ -627,6 +637,8 @@ function todayTab(){
   if(ath && S.db && S.canWrite!==false) h+='<div><button class="btn ghost sm" data-act="to-log">Gå til log ↓</button></div>';
   (w.blocks||[]).forEach(function(b){ h+=blockHtml(b,w,ath); });
   h+=logPanel(w,ath);
+  h+=hrCard(S.date,S.me);
+  if(window.STRAVA&&window.STRAVA.shareHr!==false) athleteList().forEach(function(x){ if(x.id!==S.me) h+=hrCard(S.date,x.id); });
   return h;
 }
 function blockHtml(b,w,ath){
@@ -904,7 +916,8 @@ function profileTab(){
     h+='<div class="skillrow"><div class="nm iname">'+esc(sk.name)+'</div><label class="f">Niveau<select id="p-lvl-'+k+'">'+opts+'</select></label>'
       +'<label class="f">Max i ét stræk<input id="p-sm-'+k+'" inputmode="numeric" value="'+esc(val('p-sm-'+k, st.max!=null?st.max:''))+'"></label></div>';
   });
-  h+='</div></section><div class="row"><button class="btn" data-act="save-profile"'+(S.canWrite===false?' disabled':'')+'>Gem profil</button></div>';
+  h+='</div></section>'+stProfile();
+  h+='<div class="row"><button class="btn" data-act="save-profile"'+(S.canWrite===false?' disabled':'')+'>Gem profil</button></div>';
   return h;
 }
 
@@ -1150,6 +1163,7 @@ async function saveProfile(){
     if(L===old.level && (mx||null)===(old.max!=null?old.max:null)) return;
     patch.skills[k]={level:L,max:mx||null,streak:L===old.level?(old.streak||0):0,fails:0,n:old.n||0};
   });
+  var mh=num(dv('p-maxhr')); if(mh!==(a.maxHr!=null?a.maxHr:null)) patch.maxHr= mh==null?{__delete__:true}:mh;
   prune(patch);
   try{
     if(Object.keys(patch).length) await enqueue(function(){ return S.db.doc('athletes/'+S.me).update(patch); });
@@ -1525,6 +1539,12 @@ document.addEventListener('click',function(ev){
   else if(a==='load-day'){ var w=S.workouts[S.date]; if(w){ var c=Object.assign({},w); delete c.date; delete c.updatedAt; S.fields['c-json']=JSON.stringify(c,null,2); S.coach.msg='Dagens program er hentet ind. Ret og tryk Gem.'; render(); } }
   else if(a==='save-program') saveProgram();
   else if(a==='del-program'){ enqueue(function(){ return S.db.doc('workouts/'+S.date).delete(); }).then(function(){ toast('Programmet er slettet.'); }).catch(function(e){ toast(errMsg(e),true); }); }
+  else if(a==='st-connect') stConnect();
+  else if(a==='st-sync') stSync();
+  else if(a==='st-link') stLink(b.getAttribute('data-id'));
+  else if(a==='st-skip') stSkip(b.getAttribute('data-id'));
+  else if(a==='st-unskip'){ lsSet('tl-st-skip','[]'); render(); }
+  else if(a==='st-disc'){ stSave(null); S.st.acts=[]; S.st.auto=false; render(); }
   else if(a==='make-status'){ S.coach.status=buildStatus(); render(); }
   else if(a==='copy-status') copyStatus();
 });
@@ -1544,7 +1564,7 @@ document.addEventListener('change',function(ev){
   var t=ev.target; if(!t.closest||!t.closest('#app')) return;
   if(edFromEl(t,true)) return;
   if(t.id) S.fields[t.id]=t.value;
-  if(t.id==='who'){ S.me=t.value||null; lsSet('tl-me',S.me||''); S.fields={}; render(); }
+  if(t.id==='who'){ S.me=t.value||null; lsSet('tl-me',S.me||''); S.fields={}; S.st.acts=[]; S.st.auto=false; stAuto(); render(); }
   else if(/-an$/.test(t.id)||t.id==='k-type'){ render(); }
   else if(t.id==='dsel' && t.value){ S.date=t.value; S.dateTouched=true; S.fields={}; render(); }
 });
@@ -1555,6 +1575,175 @@ document.addEventListener('focusout',function(){
     if(S.dirty&&!typing) render();
   },250);
 });
+
+
+/* ---------- Strava: puls, zoner og kobling til dagens workout ---------- */
+var ZONES=[
+  {n:'Zone 1',d:'Meget let',lo:0,c:'#7da8ff'},
+  {n:'Zone 2',d:'Let',lo:.6,c:'#4fb893'},
+  {n:'Zone 3',d:'Moderat',lo:.7,c:'#d9b83c'},
+  {n:'Zone 4',d:'Hård',lo:.8,c:'#ee9438'},
+  {n:'Zone 5',d:'Maks',lo:.9,c:'#dc4f44'}
+];
+function stCfg(){ var c=window.STRAVA; return (c&&c.clientId&&c.worker)?c:null; }
+function stKey(){ return 'tl-strava-'+S.me; }
+function stLoad(){ try{ var v=lsGet(stKey()); return v?JSON.parse(v):null; }catch(e){ return null; } }
+function stSave(o){ lsSet(stKey(),o?JSON.stringify(o):''); }
+function stSkips(){ try{ return JSON.parse(lsGet('tl-st-skip')||'[]'); }catch(e){ return []; } }
+function stRedirect(){ return location.origin+location.pathname; }
+function stConnect(){
+  var c=stCfg(); if(!c||!S.me) return;
+  location.href='https://www.strava.com/oauth/authorize?client_id='+encodeURIComponent(c.clientId)+'&redirect_uri='+encodeURIComponent(stRedirect())
+    +'&response_type=code&approval_prompt=auto&scope=activity:read_all&state='+encodeURIComponent('tlstrava:'+S.me);
+}
+async function stWorker(path,opt){
+  var c=stCfg(), r=await fetch(c.worker.replace(/\/$/,'')+path,opt||{});
+  var j=null; try{ j=await r.json(); }catch(e){}
+  if(!r.ok){ var e=new Error((j&&(j.message||j.error))||('Strava-fejl '+r.status)); e.status=r.status; throw e; }
+  return j;
+}
+function stPost(path,body){ return stWorker(path,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}); }
+async function stHandleReturn(){
+  var q=new URLSearchParams(location.search), st=q.get('state')||'';
+  if(st.indexOf('tlstrava:')!==0) return;
+  var id=st.slice(9), code=q.get('code'), scope=q.get('scope')||'';
+  history.replaceState(null,'',location.pathname);
+  if(!stCfg()) return;
+  if(q.get('error')||!code){ toast('Strava-forbindelsen blev afbrudt.',true); return; }
+  try{
+    var j=await stPost('/token',{code:code});
+    var o={at:j.access_token,rt:j.refresh_token,exp:j.expires_at,sid:j.athlete&&j.athlete.id};
+    S.me=id; lsSet('tl-me',id); lsSet('tl-strava-'+id,JSON.stringify(o));
+    toast(/activity:read/.test(scope)?'Strava er forbundet.':'Strava er forbundet, men uden adgang til aktiviteter. Forbind igen og lad hakkerne stå.',!/activity:read/.test(scope));
+    stSync();
+  }catch(e){ toast('Kunne ikke forbinde Strava: '+e.message,true); }
+}
+async function stToken(){
+  var o=stLoad(); if(!o) throw new Error('Ikke forbundet til Strava.');
+  if(o.exp-60>Date.now()/1000) return o.at;
+  var j=await stPost('/refresh',{refresh_token:o.rt});
+  o.at=j.access_token; o.rt=j.refresh_token||o.rt; o.exp=j.expires_at; stSave(o);
+  return o.at;
+}
+async function stApi(path){
+  var tk=await stToken();
+  return stWorker(path,{headers:{Authorization:'Bearer '+tk}});
+}
+function stLinked(){
+  var m={}; Object.keys(S.results).forEach(function(k){ var r=S.results[k]; if(r&&r.hr&&r.hr.sid) m[r.hr.sid]=1; }); return m;
+}
+async function stSync(){
+  if(!stCfg()||!S.me||!stLoad()||S.st.busy) return;
+  S.st.busy=true; S.st.err=''; schedule();
+  try{
+    var after=Math.floor(Date.now()/1000)-14*86400;
+    var list=await stApi('/api/activities?per_page=30&after='+after);
+    S.st.acts=(list||[]).filter(function(a){ return a.has_heartrate; });
+    S.st.at=Date.now();
+  }catch(e){
+    S.st.err=e.status===401?'Strava-forbindelsen er udløbet. Forbind igen under Profil.':e.message;
+    if(e.status===401) stSave(null);
+  }
+  S.st.busy=false; schedule();
+}
+function stAuto(){
+  if(S.st.auto||!S.me||!S.loaded.r||!stCfg()||!stLoad()) return;
+  S.st.auto=true; stSync();
+}
+function stPending(){
+  var linked=stLinked(), sk=stSkips();
+  return (S.st.acts||[]).filter(function(a){ return !linked[a.id]&&sk.indexOf(a.id)<0; })
+    .sort(function(a,b){ return b.start_date_local<a.start_date_local?-1:1; });
+}
+function stDur(sec){ var m=Math.round(sec/60); return m>=60?Math.floor(m/60)+' t '+(m%60)+' min':m+' min'; }
+function stCandidates(date){
+  var ds=visibleDates(), t0=parseDate(date).getTime();
+  return ds.map(function(d){ return {d:d,diff:Math.abs(parseDate(d).getTime()-t0)}; })
+    .filter(function(x){ return x.diff<=3*86400000; })
+    .sort(function(a,b){ return a.diff-b.diff; }).map(function(x){ return x.d; });
+}
+function stravaPrompt(){
+  if(!stCfg()||!S.me||!stLoad()) return '';
+  if(S.st.err) return '<div class="notice warn"><p>'+esc(S.st.err)+'</p></div>';
+  var p=stPending(); if(!p.length) return '';
+  var a=p[0], date=a.start_date_local.slice(0,10), cands=stCandidates(date);
+  var h='<div class="stcard"><h3>Ny aktivitet fra Strava</h3><p class="small"><b>'+esc(a.name)+'</b> · '+esc(shortLabel(date))+' kl. '+esc(a.start_date_local.slice(11,16))
+    +' · '+esc(stDur(a.elapsed_time))+(a.average_heartrate?' · gns. puls '+Math.round(a.average_heartrate):'')+(a.max_heartrate?' · maks '+Math.round(a.max_heartrate):'')+'</p>';
+  if(cands.length){
+    var sel=val('st-d',cands[0]);
+    h+='<label class="f wide">Knyt til træning<select id="st-d">'+cands.map(function(d){
+      var w=S.workouts[d]; return '<option value="'+esc(d)+'"'+(d===sel?' selected':'')+'>'+esc(shortLabel(d)+(w&&w.title?' · '+w.title:''))+'</option>'; }).join('')+'</select></label>'
+      +'<div class="row"><button class="btn" data-act="st-link" data-id="'+a.id+'"'+(S.st.busy?' disabled':'')+'>Knyt og hent puls</button> <button class="btn ghost" data-act="st-skip" data-id="'+a.id+'">Ignorér</button></div>';
+  } else h+='<p class="small muted">Der er intet program omkring den dag at knytte til.</p><div class="row"><button class="btn ghost" data-act="st-skip" data-id="'+a.id+'">Ignorér</button></div>';
+  if(p.length>1) h+='<p class="hint">Plus '+(p.length-1)+' flere aktiviteter, der venter.</p>';
+  return h+'</div>';
+}
+async function stLink(id){
+  var a=(S.st.acts||[]).filter(function(x){ return String(x.id)===String(id); })[0]; if(!a) return;
+  var cands=stCandidates(a.start_date_local.slice(0,10)), date=val('st-d',cands[0]); if(!date){ toast('Vælg en træning.',true); return; }
+  S.st.busy=true; render();
+  try{
+    var s=await stApi('/api/streams?id='+a.id), hr=s&&s.heartrate&&s.heartrate.data, tm=s&&s.time&&s.time.data;
+    if(!hr||!hr.length||!tm||tm.length!==hr.length) throw new Error('Aktiviteten har ingen pulsdata.');
+    var dur=tm[tm.length-1], step=Math.max(5,Math.ceil(dur/360)), pts=[], j=0;
+    for(var tt=0;tt<=dur;tt+=step){ while(j<tm.length-1&&tm[j+1]<=tt) j++; pts.push(hr[j]); }
+    var avg=a.average_heartrate?Math.round(a.average_heartrate):Math.round(hr.reduce(function(x,y){return x+y;},0)/hr.length);
+    var mx=a.max_heartrate?Math.round(a.max_heartrate):Math.max.apply(null,hr);
+    await writeResult(date,S.me,{hr:{sid:a.id,name:a.name,start:a.start_date_local,dur:dur,step:step,avg:avg,max:mx,pts:pts}});
+    S.fields={}; S.date=date; S.dateTouched=true; S.st.busy=false; toast('Puls er knyttet til '+shortLabel(date).replace(/\.$/,'')+'.'); render();
+  }catch(e){ S.st.busy=false; toast(e.message,true); render(); }
+}
+function stSkip(id){ var sk=stSkips(); sk.push(Number(id)); lsSet('tl-st-skip',JSON.stringify(sk)); render(); }
+function maxHrOf(ath){
+  if(ath&&ath.maxHr) return {v:ath.maxHr,est:false};
+  var m=0; Object.keys(S.results).forEach(function(k){ var r=S.results[k]; if(r&&r.athleteId===ath.__id&&r.hr&&r.hr.max>m) m=r.hr.max; });
+  return {v:Math.max(m,150),est:true};
+}
+function zoneSecs(hr,mx){
+  var z=[0,0,0,0,0];
+  (hr.pts||[]).forEach(function(b){ var i=0; for(var k=4;k>=0;k--) if(b>=ZONES[k].lo*mx){ i=k; break; } z[i]+=hr.step; });
+  return z;
+}
+function hrChart(hr,mx){
+  var W=340,H=170,L=34,R=8,T=8,B=22, pts=hr.pts, n=pts.length, tot=(n-1)*hr.step||1;
+  var lo=Math.floor((Math.min.apply(null,pts)-5)/10)*10, hi=Math.ceil((Math.max(Math.max.apply(null,pts),ZONES[1].lo*mx)+5)/10)*10;
+  var X=function(i){ return L+(W-L-R)*i*hr.step/tot; }, Y=function(b){ return T+(H-T-B)*(1-(b-lo)/(hi-lo)); };
+  var s='<svg class="hrsvg" viewBox="0 0 '+W+' '+H+'" role="img" aria-label="Puls igennem træningen">';
+  ZONES.forEach(function(z,k){
+    var a=z.lo*mx, b=k<4?ZONES[k+1].lo*mx:9999, y1=Y(Math.min(b,hi)), y2=Y(Math.max(a,lo));
+    if(a<hi&&b>lo) s+='<rect x="'+L+'" y="'+y1.toFixed(1)+'" width="'+(W-L-R)+'" height="'+Math.max(0,y2-y1).toFixed(1)+'" fill="'+z.c+'" opacity=".2"/>';
+  });
+  for(var v=lo;v<=hi;v+=20) s+='<text x="'+(L-4)+'" y="'+(Y(v)+3).toFixed(1)+'" font-size="9" text-anchor="end" fill="currentColor" opacity=".6">'+v+'</text>';
+  var step=tot>3600?15:tot>1800?10:5;
+  for(var m=0;m*60<=tot;m+=step) s+='<text x="'+X(m*60/hr.step).toFixed(1)+'" y="'+(H-6)+'" font-size="9" text-anchor="middle" fill="currentColor" opacity=".6">'+m+' min</text>';
+  s+='<path d="'+pts.map(function(b,i){ return (i?'L':'M')+X(i).toFixed(1)+' '+Y(b).toFixed(1); }).join('')+'" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>';
+  return s;
+}
+function hrCard(date,id){
+  var r=resDoc(date,id), hr=r&&r.hr; if(!hr||!hr.pts||!hr.pts.length) return '';
+  if(id!==S.me&&!S.canCoach&&!(window.STRAVA&&window.STRAVA.shareHr!==false)) return '';
+  var ath=S.athletes[id]; if(!ath) return '';
+  var m=maxHrOf(ath), z=zoneSecs(hr,m.v), tot=z.reduce(function(a,b){return a+b;},0)||1;
+  var h='<section class="block"><div class="bhead"><span class="tag">Puls</span><h2>'+(id!==S.me?esc(ath.name)+' · ':'')+esc(hr.name||'Strava')+'</h2><div class="fmt muted">'+esc(stDur(hr.dur))+' · fra Strava</div></div>'
+    +'<div class="zstat"><span class="small muted">Gennemsnit<b>'+hr.avg+'</b></span><span class="small muted">Maks<b>'+hr.max+'</b></span><span class="small muted">Maxpuls brugt<b>'+m.v+'</b></span></div>'
+    +hrChart(hr,m.v)+'<div style="margin-top:10px">';
+  ZONES.forEach(function(zz,k){
+    h+='<div class="zrow"><span><b>'+zz.n+'</b><br><small class="muted">'+zz.d+'</small></span><span class="zbar"><i style="width:'+(z[k]/tot*100).toFixed(1)+'%;background:'+zz.c+'"></i></span><span>'+stDur(z[k]).replace(' min',' m')+' <small class="muted">'+Math.round(z[k]/tot*100)+'%</small></span></div>';
+  });
+  h+='</div><div class="hint">Zonerne er procent af maxpulsen ('+Math.round(ZONES[1].lo*100)+', 70, 80 og 90 %).'+(m.est?' Din maxpuls er endnu ikke sat, så jeg bruger den højeste puls, jeg har set. Sæt den under Profil for rigtige zoner.':'')+'</div></section>';
+  return h;
+}
+function stProfile(){
+  var a=myAth();
+  var h='<section class="sec"><h2>Puls og Strava</h2><label class="f">Maxpuls (slag i minuttet)<input id="p-maxhr" inputmode="numeric" value="'+esc(val('p-maxhr',a&&a.maxHr!=null?a.maxHr:''))+'"></label>'
+    +'<p class="hint">Bruges til pulszonerne. Har du ikke testet den, så skriv den højeste puls du har set i hårde konditest.</p>';
+  if(!stCfg()) return h+'<p class="small muted">Strava er ikke sat op endnu. Coachen skal først udfylde filen strava-config.js.</p></section>';
+  if(stLoad()){
+    h+='<p class="small">Forbundet til Strava på denne enhed.</p><div class="row"><button class="btn ghost sm" data-act="st-sync"'+(S.st.busy?' disabled':'')+'>'+(S.st.busy?'Tjekker…':'Tjek Strava nu')+'</button> <button class="btn danger sm" data-act="st-disc">Afbryd</button> <button class="btn ghost sm" data-act="st-unskip">Vis ignorerede igen</button></div>'
+      +(S.st.at?'<p class="hint">Sidst tjekket '+new Date(S.st.at).toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})+'. Ser kun aktiviteter fra de seneste 14 dage med pulsdata.</p>':'');
+  } else h+='<p class="small muted">Forbind, så finder appen dine tracked træninger og kan knytte dem til dagens workout.</p><div class="row"><button class="btn" data-act="st-connect"'+(S.me?'':' disabled')+'>Forbind Strava</button></div>';
+  return h+'</section>';
+}
 
 /* ---------- Start ---------- */
 function ensureMe(){
@@ -1571,6 +1760,7 @@ function autoDate(){
   var ds=visibleDates(); if(ds.length) S.date=ds[ds.length-1];
 }
 async function init(){
+  stHandleReturn();
   render();
   var C=window.claude;
   if(!C||!C.use){ S.noRuntime=true; render(); return; }
@@ -1602,7 +1792,7 @@ async function init(){
     subWorkouts(); render();
   };
   S.db.collection('results').orderBy('date','desc').limit(400).onSnapshot(function(snap){
-    var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); }); S.results=o; S.loaded.r=true; schedule();
+    var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); }); S.results=o; S.loaded.r=true; stAuto(); schedule();
   },mkErr('results'));
   render();
 }
