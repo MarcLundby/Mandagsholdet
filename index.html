@@ -465,7 +465,7 @@ function fmtEntry(e){
   if(e.kind==='skill') return (e.label||e.name)+': '+e.levelName+(e.reps?' · '+e.reps+' reps':'')+' · '+(COMP[e.comp]||'')+(e.max?' · max '+e.max:'')+rpe;
   if(e.kind==='free') return (e.name||'Øvelse')+': '+[e.load!=null&&e.load!==''?nf(e.load)+' kg':'',e.reps?e.reps+' reps':'',COMP[e.comp]||'',e.rpe?'RPE '+nf(e.rpe):'',e.note||''].filter(Boolean).join(' · ');
   if(e.kind==='machine') return (e.name||MACH[e.machine]||'Maskine')+': '+[e.cal!=null&&e.cal!==''?nf(e.cal)+' cal':'',e.m!=null&&e.m!==''?nf(e.m)+' m':'',e.time?e.time:'',lapSum(e.laps)].filter(Boolean).join(' · ')+(e.note?' ('+e.note+')':'');
-  if(e.kind==='metcon') return 'Kondi'+(e.title?' ('+e.title+')':'')+': '+(e.rounds!=null?e.rounds+' runder'+(e.extra?' + '+e.extra+' reps':''):(e.score||'–'))+(e.scale?' · '+(MCSCALE[e.scale]||e.scale):'')+rpe+(e.note?' ('+e.note+')':'');
+  if(e.kind==='metcon') return 'Kondi'+(e.title?' ('+e.title+')':'')+': '+(e.rounds!=null?e.rounds+' runder'+(e.extra?' + '+e.extra+' reps':''):(e.score||'–'))+(e.scale?' · '+(MCSCALE[e.scale]||e.scale):'')+(e.laps&&e.laps.length?' · '+lapSum(e.laps):'')+rpe+(e.note?' ('+e.note+')':'');
   if(e.kind==='overall') return 'Samlet: '+(e.score||'–')+rpe+(e.note?' ('+e.note+')':'');
   return '';
 }
@@ -822,19 +822,11 @@ function logRow(r,ath,w,items){
       +'<label class="f">Kalorier<input id="'+id+'kc" inputmode="decimal" value="'+esc(val(id+'kc',e&&e.cal!=null?nf(e.cal):''))+'"></label>'
       +'<label class="f">Meter<input id="'+id+'km" inputmode="decimal" value="'+esc(val(id+'km',e&&e.m!=null?nf(e.m):''))+'"></label>'
       +'<label class="f">Tid (valgfri)<input id="'+id+'kt" placeholder="fx 1:42" value="'+esc(val(id+'kt',e&&e.time||''))+'"></label>'
-      +lapInputs(w,r,id,e)+'</div>';
+      +'</div>';
   }
   return h+altHtml(id,alt)+'</div>';
 }
-function lapInputs(w,r,id,e){
-  var n=roundsOf(w,r.bi,r.it), lp=(e&&e.laps)||[];
-  if(!n) return '<label class="f wide">Tid pr. runde (valgfri)<input id="'+id+'kl" placeholder="fx 1:52, 1:54, 1:55, 1:57" value="'+esc(val(id+'kl',lp.filter(function(x){return x!=null;}).map(lapFmt).join(', ')))+'"></label>'
-    +'<div class="hint wide">Skriv rundetiderne i rækkefølge, adskilt af komma, fx 1:52, 1:54.</div>';
-  var h='<div class="wide"><div class="hint" style="margin-bottom:4px">Tid pr. runde (valgfri), fx 1:52. Spring en runde over, hvis du ikke har tiden.</div><div class="lapgrid">';
-  for(var i=0;i<n;i++) h+='<label class="f">R'+(i+1)+'<input id="'+id+'kl'+i+'" inputmode="text" placeholder="m:ss" value="'+esc(val(id+'kl'+i,lp[i]!=null?lapFmt(lp[i]):''))+'"></label>';
-  return h+'</div></div>';
-}
-function mcFields(b,bi,items){
+function mcFields(b,bi,items,w){
   var e=items['mc_'+bi]||{}, id='lg-mc'+bi+'-', h='<div class="item"><div class="irow"><div class="iname">Resultat</div><div class="hint">'+esc(b.format||'')+'</div></div><div class="log">';
   if(b.metric==='time') h+='<label class="f wide">Tid (fx 12:34)<input id="'+id+'s" value="'+esc(val(id+'s',e.score||''))+'"></label>';
   else h+='<label class="f">Runder<input id="'+id+'d" inputmode="numeric" value="'+esc(val(id+'d',e.rounds!=null?e.rounds:''))+'"></label>'
@@ -842,8 +834,14 @@ function mcFields(b,bi,items){
     +'<label class="f wide">Andet resultat (valgfrit, fx kalorier eller meter)<input id="'+id+'s" value="'+esc(val(id+'s',e.rounds!=null?'':(e.score||'')))+'"></label>';
   h+='<label class="f">Rx eller skaleret<select id="'+id+'x">'+Object.keys(MCSCALE).map(function(k){return '<option value="'+k+'"'+(val(id+'x',e.scale||'rx')===k?' selected':'')+'>'+esc(MCSCALE[k])+'</option>';}).join('')+'</select></label>'
     +'<label class="f">RPE'+rpeSel(id+'r',val(id+'r',e.rpe!=null?e.rpe:''))+'</label>'
-    +'<label class="f wide">Note (fx hvad du skalerede)<input id="'+id+'n" value="'+esc(val(id+'n',e.note||''))+'"></label></div></div>';
-  return h;
+    +'<label class="f wide">Note (fx hvad du skalerede)<input id="'+id+'n" value="'+esc(val(id+'n',e.note||''))+'"></label>';
+  var n=roundsOf(w,bi,null), lp=e.laps||[];
+  if(n){
+    h+='<div class="wide"><div class="hint" style="margin-bottom:4px">Tid pr. runde (valgfri), fx 2:45. Én tid for hele runden. Spring en runde over, hvis du ikke har tiden.</div><div class="lapgrid">';
+    for(var i=0;i<n;i++) h+='<label class="f">Runde '+(i+1)+'<input id="'+id+'kl'+i+'" inputmode="text" placeholder="m:ss" value="'+esc(val(id+'kl'+i,lp[i]!=null?lapFmt(lp[i]):''))+'"></label>';
+    h+='</div></div>';
+  }
+  return h+'</div></div>';
 }
 function logPanel(w,ath){
   if(!ath||!S.db||S.canWrite===false) return '';
@@ -855,7 +853,7 @@ function logPanel(w,ath){
     var br=rows.filter(function(r){return r.bi===bi;}), mc=b.type==='metcon';
     if(!mc&&!br.length) return;
     h+='<div class="item head">'+esc((b.title||TYPES[b.type]||'')+(b.format?' · '+b.format:''))+'</div>';
-    if(mc) h+=mcFields(b,bi,items);
+    if(mc) h+=mcFields(b,bi,items,w);
     br.forEach(function(r){ h+=logRow(r,ath,w,items); });
   });
   var o=items.overall||{};
@@ -1107,14 +1105,8 @@ async function saveLog(){
       e=Object.assign({kind:'free',name:it.label||'Øvelse',load:fw===''?null:num(fw),reps:reps,comp:comp,rpe:rpe,note:fn},base);
     } else {
       var cal=num(dv(id+'kc')), mt=num(dv(id+'km')), tm=dv(id+'kt').trim();
-      var lp, nR=roundsOf(w,r.bi,it);
-      if(nR){ lp={laps:[],bad:false}; for(var q=0;q<nR;q++){ var tv=dv(id+'kl'+q).trim(); if(!tv){ lp.laps.push(null); continue; } var pr1=lapParse(tv); if(pr1.bad||pr1.laps.length!==1) lp.bad=true; else lp.laps.push(pr1.laps[0]); }
-        while(lp.laps.length&&lp.laps[lp.laps.length-1]==null) lp.laps.pop(); }
-      else lp=lapParse(dv(id+'kl'));
-      if(lp.bad){ bad='Rundetiderne for '+(it.label||'maskinen')+' skal skrives som fx 1:52, 1:54.'; return; }
-      if(!alt&&cal==null&&mt==null&&!tm&&!lp.laps.length) return;
+      if(!alt&&cal==null&&mt==null&&!tm) return;
       e=Object.assign({kind:'machine',machine:it.machine,name:it.label||MACH[it.machine],cal:cal,m:mt,time:tm},base);
-      if(lp.laps.length) e.laps=lp.laps;
     }
     if(alt) e.alt=alt;
     items[key]=e;
@@ -1159,7 +1151,10 @@ async function saveLog(){
       if(rounds==null||extra==null){ bad='Runder og reps skal være tal.'; return; }
       score=rounds+'+'+extra;
     }
-    if(score||nt||rp!=null) items['mc_'+bi]={kind:'metcon',title:b.title||'',score:score,rounds:rounds,extra:extra,scale:dv(id+'x')||'rx',rpe:rp,note:nt,ts:Date.now()};
+    var nR=roundsOf(w,bi,null), laps=[];
+    for(var q=0;q<nR;q++){ var tv=dv(id+'kl'+q).trim(); if(!tv){ laps.push(null); continue; } var pr1=lapParse(tv); if(pr1.bad||pr1.laps.length!==1){ bad='Rundetiderne skal skrives som fx 2:45.'; return; } laps.push(pr1.laps[0]); }
+    while(laps.length&&laps[laps.length-1]==null) laps.pop();
+    if(score||nt||rp!=null||laps.length){ items['mc_'+bi]={kind:'metcon',title:b.title||'',score:score,rounds:rounds,extra:extra,scale:dv(id+'x')||'rx',rpe:rp,note:nt,ts:Date.now()}; if(laps.length) items['mc_'+bi].laps=laps; }
   });
   if(bad){ toast(bad,true); return; }
   var os=dv('lg-o-score').trim(), orpe=num(dv('lg-o-rpe')), on=dv('lg-o-note').trim();
