@@ -117,6 +117,9 @@ label.f input,label.f select{text-transform:none;letter-spacing:0;color:var(--in
 .chip.good{color:var(--good)} .chip.warn{color:var(--warn)} .chip.bad{color:var(--bad)} .chip.acc{color:var(--accent)}
 .log{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:8px;align-items:end}
 .log .wide{grid-column:span 2}
+.log div.wide{grid-column:1/-1}
+.lapgrid{display:grid;grid-template-columns:repeat(4,1fr);gap:6px}
+.lapgrid .f{font-size:12px}
 .saved{font-size:13px;color:var(--good);font-weight:600}
 .blocklog{padding:12px 16px;border-top:1px solid var(--line);background:color-mix(in srgb,var(--accent-soft) 40%,var(--surface));display:flex;flex-direction:column;gap:10px}
 
@@ -448,8 +451,13 @@ function lapParse(s){
   });
   return {laps:out,bad:bad};
 }
+function roundsOf(w,bi,it){
+  var b=w&&w.blocks&&w.blocks[bi]; if(!b) return 0;
+  var m=/(\d+)\s*(?:runder|rounds?|rds|sæt)\b/i.exec((b.format||'')+' '+(b.title||'')+' '+(b.notes||'')); if(!m) m=/^(\d+)\s*x\b/i.exec(it&&it.label||'');
+  var n=m?parseInt(m[1],10):0; return n>=2&&n<=30?n:0;
+}
 function lapFmt(s){ var m=Math.floor(s/60), r=Math.round((s-m*60)*10)/10; return m+':'+(r<10?'0':'')+String(r).replace('.',','); }
-function lapSum(l){ if(!l||!l.length) return ''; var av=l.reduce(function(a,b){return a+b;},0)/l.length; return l.length+' runder, hurtigste '+lapFmt(Math.min.apply(null,l))+', snit '+lapFmt(av); }
+function lapSum(l){ l=(l||[]).filter(function(x){return x!=null;}); if(!l.length) return ''; var av=l.reduce(function(a,b){return a+b;},0)/l.length; return l.length+' runder, hurtigste '+lapFmt(Math.min.apply(null,l))+', snit '+lapFmt(av); }
 function fmtEntry(e){
   var rpe=e.rpe?' · RPE '+nf(e.rpe):'';
   if(e.alt) return (e.label||e.name||'Øvelse')+' → '+fmtAlt(e.alt)+rpe;
@@ -814,10 +822,17 @@ function logRow(r,ath,w,items){
       +'<label class="f">Kalorier<input id="'+id+'kc" inputmode="decimal" value="'+esc(val(id+'kc',e&&e.cal!=null?nf(e.cal):''))+'"></label>'
       +'<label class="f">Meter<input id="'+id+'km" inputmode="decimal" value="'+esc(val(id+'km',e&&e.m!=null?nf(e.m):''))+'"></label>'
       +'<label class="f">Tid (valgfri)<input id="'+id+'kt" placeholder="fx 1:42" value="'+esc(val(id+'kt',e&&e.time||''))+'"></label>'
-      +'<label class="f wide">Tid pr. runde (valgfri)<input id="'+id+'kl" placeholder="fx 1:52, 1:54, 1:55, 1:57" value="'+esc(val(id+'kl',e&&e.laps?e.laps.map(lapFmt).join(', '):''))+'"></label>'
-      +'<div class="hint wide">Skriv rundetiderne i rækkefølge, adskilt af komma, fx 1:52, 1:54. Så kan jeg se, om tempoet falder gennem intervallerne.</div></div>';
+      +lapInputs(w,r,id,e)+'</div>';
   }
   return h+altHtml(id,alt)+'</div>';
+}
+function lapInputs(w,r,id,e){
+  var n=roundsOf(w,r.bi,r.it), lp=(e&&e.laps)||[];
+  if(!n) return '<label class="f wide">Tid pr. runde (valgfri)<input id="'+id+'kl" placeholder="fx 1:52, 1:54, 1:55, 1:57" value="'+esc(val(id+'kl',lp.filter(function(x){return x!=null;}).map(lapFmt).join(', ')))+'"></label>'
+    +'<div class="hint wide">Skriv rundetiderne i rækkefølge, adskilt af komma, fx 1:52, 1:54.</div>';
+  var h='<div class="wide"><div class="hint" style="margin-bottom:4px">Tid pr. runde (valgfri), fx 1:52. Spring en runde over, hvis du ikke har tiden.</div><div class="lapgrid">';
+  for(var i=0;i<n;i++) h+='<label class="f">R'+(i+1)+'<input id="'+id+'kl'+i+'" inputmode="text" placeholder="m:ss" value="'+esc(val(id+'kl'+i,lp[i]!=null?lapFmt(lp[i]):''))+'"></label>';
+  return h+'</div></div>';
 }
 function mcFields(b,bi,items){
   var e=items['mc_'+bi]||{}, id='lg-mc'+bi+'-', h='<div class="item"><div class="irow"><div class="iname">Resultat</div><div class="hint">'+esc(b.format||'')+'</div></div><div class="log">';
@@ -1092,7 +1107,10 @@ async function saveLog(){
       e=Object.assign({kind:'free',name:it.label||'Øvelse',load:fw===''?null:num(fw),reps:reps,comp:comp,rpe:rpe,note:fn},base);
     } else {
       var cal=num(dv(id+'kc')), mt=num(dv(id+'km')), tm=dv(id+'kt').trim();
-      var lp=lapParse(dv(id+'kl'));
+      var lp, nR=roundsOf(w,r.bi,it);
+      if(nR){ lp={laps:[],bad:false}; for(var q=0;q<nR;q++){ var tv=dv(id+'kl'+q).trim(); if(!tv){ lp.laps.push(null); continue; } var pr1=lapParse(tv); if(pr1.bad||pr1.laps.length!==1) lp.bad=true; else lp.laps.push(pr1.laps[0]); }
+        while(lp.laps.length&&lp.laps[lp.laps.length-1]==null) lp.laps.pop(); }
+      else lp=lapParse(dv(id+'kl'));
       if(lp.bad){ bad='Rundetiderne for '+(it.label||'maskinen')+' skal skrives som fx 1:52, 1:54.'; return; }
       if(!alt&&cal==null&&mt==null&&!tm&&!lp.laps.length) return;
       e=Object.assign({kind:'machine',machine:it.machine,name:it.label||MACH[it.machine],cal:cal,m:mt,time:tm},base);
