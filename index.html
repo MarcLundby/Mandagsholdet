@@ -1585,6 +1585,7 @@ document.addEventListener('click',function(ev){
   else if(a==='st-sync') stSync();
   else if(a==='st-link') stLink(b.getAttribute('data-id'));
   else if(a==='st-skip') stSkip(b.getAttribute('data-id'));
+  else if(a==='st-next'){ S.st.pi=(S.st.pi||0)+1; delete S.fields['st-d']; render(); }
   else if(a==='st-unskip'){ lsSet('tl-st-skip','[]'); render(); }
   else if(a==='st-disc'){ stSave(null); S.st.acts=[]; S.st.auto=false; render(); }
   else if(a==='make-status'){ S.coach.status=buildStatus(); render(); }
@@ -1702,14 +1703,14 @@ function stDur(sec){ var m=Math.round(sec/60); return m>=60?Math.floor(m/60)+' t
 function stCandidates(date){
   var ds=visibleDates(), t0=parseDate(date).getTime();
   return ds.map(function(d){ return {d:d,diff:Math.abs(parseDate(d).getTime()-t0)}; })
-    .filter(function(x){ return x.diff<=3*86400000; })
+    .filter(function(x){ return x.diff<=21*86400000; })
     .sort(function(a,b){ return a.diff-b.diff; }).map(function(x){ return x.d; });
 }
 function stravaPrompt(){
   if(!stCfg()||!S.me||!stLoad()) return '';
   if(S.st.err) return '<div class="notice warn"><p>'+esc(S.st.err)+'</p></div>';
   var p=stPending(); if(!p.length) return '';
-  var a=p[0], date=a.start_date_local.slice(0,10), cands=stCandidates(date);
+  var a=p[(S.st.pi||0)%p.length], date=a.start_date_local.slice(0,10), cands=stCandidates(date);
   var h='<div class="stcard"><h3>Ny aktivitet fra Strava</h3><p class="small"><b>'+esc(a.name)+'</b> · '+esc(shortLabel(date))+' kl. '+esc(a.start_date_local.slice(11,16))
     +' · '+esc(stDur(a.elapsed_time))+(a.average_heartrate?' · gns. puls '+Math.round(a.average_heartrate):'')+(a.max_heartrate?' · maks '+Math.round(a.max_heartrate):'')+'</p>';
   if(cands.length){
@@ -1718,7 +1719,7 @@ function stravaPrompt(){
       var w=S.workouts[d]; return '<option value="'+esc(d)+'"'+(d===sel?' selected':'')+'>'+esc(shortLabel(d)+(w&&w.title?' · '+w.title:''))+'</option>'; }).join('')+'</select></label>'
       +'<div class="row"><button class="btn" data-act="st-link" data-id="'+a.id+'"'+(S.st.busy?' disabled':'')+'>Knyt og hent puls</button> <button class="btn ghost" data-act="st-skip" data-id="'+a.id+'">Ignorér</button></div>';
   } else h+='<p class="small muted">Der er intet program omkring den dag at knytte til.</p><div class="row"><button class="btn ghost" data-act="st-skip" data-id="'+a.id+'">Ignorér</button></div>';
-  if(p.length>1) h+='<p class="hint">Plus '+(p.length-1)+' flere aktiviteter, der venter.</p>';
+  if(p.length>1) h+='<p class="hint">Plus '+(p.length-1)+' flere aktiviteter, der venter. <button class="btn ghost sm" data-act="st-next">Vis næste</button></p>';
   return h+'</div>';
 }
 async function stLink(id){
@@ -1733,7 +1734,7 @@ async function stLink(id){
     var avg=a.average_heartrate?Math.round(a.average_heartrate):Math.round(hr.reduce(function(x,y){return x+y;},0)/hr.length);
     var mx=a.max_heartrate?Math.round(a.max_heartrate):Math.max.apply(null,hr);
     await writeResult(date,S.me,{hr:{sid:a.id,name:a.name,start:a.start_date_local,dur:dur,step:step,avg:avg,max:mx,pts:pts}});
-    S.fields={}; S.date=date; S.dateTouched=true; S.st.busy=false; toast('Puls er knyttet til '+shortLabel(date).replace(/\.$/,'')+'.'); render();
+    S.fields={}; S.st.pi=0; S.date=date; S.dateTouched=true; S.st.busy=false; toast('Puls er knyttet til '+shortLabel(date).replace(/\.$/,'')+'.'); render();
   }catch(e){ S.st.busy=false; toast(e.message,true); render(); }
 }
 function stSkip(id){ var sk=stSkips(); sk.push(Number(id)); lsSet('tl-st-skip',JSON.stringify(sk)); render(); }
