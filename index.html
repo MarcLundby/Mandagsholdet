@@ -1681,7 +1681,8 @@ async function stSync(){
   try{
     var after=Math.floor(Date.now()/1000)-120*86400;
     var list=await stApi('/api/activities?per_page=100&after='+after);
-    S.st.acts=(list||[]).filter(function(a){ return a.has_heartrate; });
+    S.st.all=list||[];
+    S.st.acts=S.st.all.filter(function(a){ return a.has_heartrate; });
     S.st.at=Date.now();
   }catch(e){
     S.st.err=e.status===401?'Strava-forbindelsen er udløbet. Forbind igen under Profil.':e.message;
@@ -1689,6 +1690,9 @@ async function stSync(){
   }
   S.st.busy=false; schedule();
 }
+document.addEventListener('visibilitychange',function(){
+  if(document.visibilityState==='visible'&&stCfg()&&S.me&&stLoad()&&!S.st.busy&&(!S.st.at||Date.now()-S.st.at>5*60000)) stSync();
+});
 function stAuto(){
   if(S.st.auto||!S.me||!S.loaded.r||!stCfg()||!stLoad()) return;
   S.st.auto=true; stSync();
@@ -1778,6 +1782,15 @@ function hrCard(date,id){
   h+='</div><div class="hint">Zonerne er procent af maxpulsen ('+Math.round(ZONES[1].lo*100)+', 70, 80 og 90 %).'+(m.est?' Din maxpuls er endnu ikke sat, så jeg bruger den højeste puls, jeg har set. Sæt den under Profil for rigtige zoner.':'')+'</div></section>';
   return h;
 }
+function stRecent(){
+  var l=(S.st.all||[]).slice().sort(function(a,b){ return b.start_date_local<a.start_date_local?-1:1; }).slice(0,8);
+  if(!l.length) return S.st.at?'<p class="small muted">Strava svarede, men fandt ingen aktiviteter de seneste 4 måneder.</p>':'';
+  var linked=stLinked(), sk=stSkips();
+  return '<div class="small" style="margin-top:8px"><b>Seneste aktiviteter fra Strava</b></div><div style="display:flex;flex-direction:column;gap:4px;margin-top:4px">'+l.map(function(a){
+    var st=linked[a.id]?'knyttet':!a.has_heartrate?'ingen pulsdata':sk.indexOf(a.id)>=0?'ignoreret':'venter';
+    return '<div class="athcard"><b>'+esc(shortLabel(a.start_date_local.slice(0,10)))+'</b><span>'+esc(a.name)+' · <i>'+st+'</i></span></div>';
+  }).join('')+'</div>';
+}
 function stProfile(){
   var a=myAth();
   var h='<section class="sec"><h2>Puls og Strava</h2><label class="f">Maxpuls (slag i minuttet)<input id="p-maxhr" inputmode="numeric" value="'+esc(val('p-maxhr',a&&a.maxHr!=null?a.maxHr:''))+'"></label>'
@@ -1785,7 +1798,7 @@ function stProfile(){
   if(!stCfg()) return h+'<p class="small muted">Strava er ikke sat op endnu. Coachen skal først udfylde filen strava-config.js.</p></section>';
   if(stLoad()){
     h+='<p class="small">Forbundet til Strava på denne enhed.</p><div class="row"><button class="btn ghost sm" data-act="st-sync"'+(S.st.busy?' disabled':'')+'>'+(S.st.busy?'Tjekker…':'Tjek Strava nu')+'</button> <button class="btn danger sm" data-act="st-disc">Afbryd</button> <button class="btn ghost sm" data-act="st-unskip">Vis ignorerede igen</button></div>'
-      +(S.st.at?'<p class="hint">Sidst tjekket '+new Date(S.st.at).toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})+'. Nye aktiviteter fra de seneste 14 dage tilbydes. Din højeste puls de seneste 4 måneder bruges som maxpuls, hvis du ikke har sat den.</p>':'');
+      +stRecent()+(S.st.at?'<p class="hint">Sidst tjekket '+new Date(S.st.at).toLocaleTimeString('da-DK',{hour:'2-digit',minute:'2-digit'})+'. Nye aktiviteter fra de seneste 14 dage tilbydes. Din højeste puls de seneste 4 måneder bruges som maxpuls, hvis du ikke har sat den.</p>':'');
   } else h+='<p class="small muted">Forbind, så finder appen dine tracked træninger og kan knytte dem til dagens workout.</p><div class="row"><button class="btn" data-act="st-connect"'+(S.me?'':' disabled')+'>Forbind Strava</button></div>';
   return h+'</section>';
 }
