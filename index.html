@@ -498,8 +498,19 @@ function mcAll(){
       }
       if(!e||e.kind!=='metcon'||ik.indexOf('mc_')!==0) return;
       var b=w.blocks[parseInt(ik.slice(3),10)]; if(!b||b.type!=='metcon') return;
-      var v=parseScore(e.score,b.metric==='time'?'time':'reps'); if(v==null) return;
-      var key=r.date+'|'+ik; if(!by[key]) by[key]={date:r.date,mode:b.mode==='cardio'?'cardio':'mix',low:b.metric==='time',rows:[]};
+      var bi3=parseInt(ik.slice(3),10), via='score', lo=b.metric==='time', md=b.mode==='cardio'?'cardio':'mix';
+      var v=parseScore(e.score,b.metric==='time'?'time':'reps');
+      if(v==null&&e.laps&&e.laps.length){
+        var nr=roundsOf(w,bi3,null);
+        if(nr&&e.laps.length===nr&&e.laps.every(function(x){return x!=null;})){
+          v=e.laps.reduce(function(s,x){return s+x;},0); via='laps'; lo=true;
+          var its=(b.items||[]).filter(function(x){return x.type!=='other';});
+          if(its.length&&its.every(function(x){return x.type==='machine';})) md='cardio';
+        }
+      }
+      if(v==null) return;
+      var key=r.date+'|'+ik; if(!by[key]) by[key]={date:r.date,mode:md,low:lo,via:via,rows:[]};
+      if(by[key].via!==via) return;
       by[key].rows.push({id:r.athleteId,v:v,scaled:e.scale==='scaled'});
     });
   });
@@ -511,6 +522,7 @@ function mcAll(){
       g.rows=g.rows.filter(function(x){return x[un]!=null;}).map(function(x){return {id:x.id,v:x[un],scaled:false};});
     }
     var n=g.rows.length; if(n<2) return;
+    if(g.rows.every(function(x){return x.v===g.rows[0].v;})) return;
     g.rows.forEach(function(x){
       var below=0, eq=0;
       g.rows.forEach(function(y){ if(y===x) return; if(y.v===x.v) eq++; else if(g.low?x.v<y.v:x.v>y.v) below++; });
