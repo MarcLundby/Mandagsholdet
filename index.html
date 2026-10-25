@@ -283,8 +283,8 @@ var LOADS = {
   dbthruster:{name:'DB thruster',unit:'kg pr. hånd',step:2.5,ref:30},
   dbsnatch:{name:'DB snatch',unit:'kg',step:2.5,ref:35},
   kbswing:{name:'KB swing',unit:'kg',step:4,ref:32},
-  kbclean:{name:'KB clean',unit:'kg pr. kettlebell',step:4,ref:40,opts:[8,12,16,20,24,28,32,36,40,44,48]},
-  dbclean:{name:'DB clean (& jerk)',unit:'kg pr. hånd',step:2.5,ref:40},
+  kbclean:{name:'KB clean',unit:'kg pr. kettlebell',step:4,ref:32,opts:[8,12,16,20,24,28,32,36,40,44,48]},
+  dbclean:{name:'DB clean (& jerk)',unit:'kg pr. hånd',step:2.5,ref:35},
   wallball:{name:'Wall ball',unit:'kg',step:1,ref:9},
   sled:{name:'Sled push',unit:'kg',step:5,ref:150}
 };
@@ -355,7 +355,7 @@ function applyEmom(w){
     var m=/\be(\d*)mom\s*(\d*)/i.exec((b.format||'')+' '+(b.title||'')), ok=m&&(m[1]===''||m[1]==='1');
     (b.items||[]).forEach(function(it){
       delete it.autoPct;
-      if(!ok||it.type!=='load'||NOEMOM[it.move]||!LOADS[it.move]) return;
+      if(!ok||it.type!=='load'||NOEMOM[it.move]||!LOADS[it.move]||!LOADS[it.move].bar) return;
       if((num(it.pct)||100)!==100) return;
       var rm=/^\s*(\d+)/.exec(String(it.reps==null||it.reps===''?it.label||'':it.reps)), reps=rm?parseInt(rm[1],10):0;
       if(reps>0) it.autoPct=emomPct(reps,m[2]?parseInt(m[2],10):0);
@@ -393,13 +393,29 @@ function sortedWorkouts(){ return Object.keys(S.workouts).sort().map(function(d)
 
 /* ---------- Skalering og læring ---------- */
 function workWeight(a,k){ var w=gw(a,k); if(w!=null) return w; var d=LOADS[k]; return d&&d.bar ? gpr(a,k) : null; }
+var PROXY={kbclean:['dbs2oh','dbthruster','dbclean','dbsnatch'],dbclean:['dbs2oh','dbthruster','kbclean','dbsnatch']};
+function estWeight(a,k){
+  var list=PROXY[k]; if(!list) return null;
+  var vals=[]; list.forEach(function(p){ var w=gw(a,p); if(w!=null&&LOADS[p]) vals.push(w*LOADS[k].ref/LOADS[p].ref); });
+  if(!vals.length) return null;
+  return vals.reduce(function(s,x){return s+x;},0)/vals.length;
+}
+function fixMoves(w){
+  (w&&w.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){
+    if(it.type!=='load') return; var lb=String(it.label||'');
+    if((it.move==='clean'||it.move==='cleanJerk')&&/\b(kb|kettlebells?)\b/i.test(lb)) it.move='kbclean';
+    else if((it.move==='clean'||it.move==='cleanJerk')&&/\b(db|dumbbells?|hantel)/i.test(lb)) it.move='dbclean';
+  }); });
+}
 function loadFor(ath,wo,it){
   var key=it.move, def=LOADS[key], pct=pctOf(it);
   var w=workWeight(ath,key);
   var plan = wo&&wo.plan&&wo.plan[key]&&S.me ? wo.plan[key][S.me] : null;
+  var est=false;
+  if(w==null){ var ew=estWeight(ath,key); if(ew!=null){ w=ew; est=true; } }
   var load = w!=null ? Math.max(0,rndLoad(def,w*pct/100)) : null;
   if(load!=null&&def.bar&&pct<=100&&load>w*pct/100+1e-9) load=Math.max(0,Math.floor(w*pct/100/def.step+1e-9)*def.step);
-  return {w:w,load:load,plan:plan==null?null:plan,pct:pct};
+  return {w:w,load:load,plan:plan==null?null:plan,pct:pct,est:est};
 }
 function nextW(def,w0,n,L,pct,comp,rpe){
   var r = rpe==null ? (comp==='full'?8:comp==='almost'?9.5:10) : rpe;
@@ -722,6 +738,7 @@ function loadItem(it,w,ath){
   if(it.note) h+='<div class="hint">'+esc(it.note)+'</div>';
   if(ath){
     var bits=[];
+    if(sc.est) bits.push('Skøn ud fra dine andre DB-vægte. Din første log justerer det.');
     if(sc.plan!=null) bits.push('Plan i programmet: '+nf(sc.plan)+' '+def.unit+(sc.load!=null&&Math.abs(sc.plan-sc.load)>=def.step?' (din tilpassede vægt er '+nf(sc.load)+')':''));
     var last=lastMove(S.me,it.move,S.date);
     if(last) bits.push('Sidst '+shortLabel(last.date)+': '+nf(last.e.load)+' kg, '+(COMP[last.e.comp]||'').toLowerCase()+(last.e.rpe?', RPE '+nf(last.e.rpe):''));
@@ -1870,7 +1887,7 @@ async function init(){
     var q=S.db.collection('workouts');
     if(window.coachAuth && !S.canCoach) q=q.where('draft','==',false);
     unsubW=q.onSnapshot(function(snap){
-      var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); applyEmom(o[d.id]); }); S.workouts=o; S.loaded.w=true; autoDate(); schedule();
+      var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); fixMoves(o[d.id]); applyEmom(o[d.id]); }); S.workouts=o; S.loaded.w=true; autoDate(); schedule();
     },mkErr('workouts, '+((window.coachAuth&&!S.canCoach)?'gæst':'coach')));
   }
   subWorkouts();
