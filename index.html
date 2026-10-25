@@ -402,6 +402,7 @@ function estWeight(a,k){
 }
 function fixMoves(w){
   (w&&w.blocks||[]).forEach(function(b){ (b.items||[]).forEach(function(it){
+    if(it.type==='free'&&NONEX.test(String(it.label||''))){ it.type='other'; it.text=String(it.label||''); return; }
     if(it.type!=='load') return; var lb=String(it.label||'');
     if((it.move==='clean'||it.move==='cleanJerk')&&/\b(kb|kettlebells?)\b/i.test(lb)) it.move='kbclean';
     else if((it.move==='clean'||it.move==='cleanJerk')&&/\b(db|dumbbells?|hantel)/i.test(lb)) it.move='dbclean';
@@ -506,7 +507,7 @@ function fmtEntry(e){
   if(e.kind==='skill') return (e.label||e.name)+': '+e.levelName+(e.reps?' · '+e.reps+' reps':'')+' · '+(COMP[e.comp]||'')+(e.max?' · max '+e.max:'')+rpe;
   if(e.kind==='free') return (e.name||'Øvelse')+': '+[e.load!=null&&e.load!==''?nf(e.load)+' kg':'',e.reps?e.reps+' reps':'',COMP[e.comp]||'',e.rpe?'RPE '+nf(e.rpe):'',e.note||''].filter(Boolean).join(' · ');
   if(e.kind==='machine') return (e.name||MACH[e.machine]||'Maskine')+': '+[e.cal!=null&&e.cal!==''?nf(e.cal)+' cal':'',e.m!=null&&e.m!==''?nf(e.m)+' m':'',e.time?e.time:'',lapSum(e.laps)].filter(Boolean).join(' · ')+(e.note?' ('+e.note+')':'');
-  if(e.kind==='metcon') return 'Kondi'+(e.title?' ('+e.title+')':'')+': '+(e.rounds!=null?e.rounds+' runder'+(e.extra?' + '+e.extra+' reps':''):(e.score||'–'))+(e.scale?' · '+(MCSCALE[e.scale]||e.scale):'')+(e.laps&&e.laps.length?' · '+lapSum(e.laps):'')+rpe+(e.note?' ('+e.note+')':'');
+  if(e.kind==='metcon') return 'Kondi'+(e.title?' ('+e.title+')':'')+': '+(e.rounds!=null?e.rounds+' runder'+(e.extra?' + '+e.extra+' reps':''):(e.score||'–'))+(e.scale?' · '+(MCSCALE[e.scale]||e.scale):'')+(e.time?' · '+e.time:'')+(e.laps&&e.laps.length?' · '+lapSum(e.laps):'')+rpe+(e.note?' ('+e.note+')':'');
   if(e.kind==='overall') return 'Samlet: '+(e.score||'–')+rpe+(e.note?' ('+e.note+')':'');
   return '';
 }
@@ -541,6 +542,11 @@ function mcAll(){
       var b=w.blocks[parseInt(ik.slice(3),10)]; if(!b||b.type!=='metcon') return;
       var bi3=parseInt(ik.slice(3),10), via='score', lo=b.metric==='time', md=b.mode==='cardio'?'cardio':'mix';
       var v=parseScore(e.score,b.metric==='time'?'time':'reps');
+      if(v==null&&e.time&&parseScore(e.time,'time')!=null){
+        v=parseScore(e.time,'time'); via='time'; lo=true;
+        var its2=(b.items||[]).filter(function(x){return x.type!=='other';});
+        if(its2.length&&its2.every(function(x){return x.type==='machine';})) md='cardio';
+      }
       if(v==null&&e.laps&&e.laps.length){
         var nr=roundsOf(w,bi3,null);
         if(nr&&e.laps.length===nr&&e.laps.every(function(x){return x!=null;})){
@@ -894,7 +900,8 @@ function logRow(r,ath,w,items){
 function mcFields(b,bi,items,w){
   var e=items['mc_'+bi]||{}, id='lg-mc'+bi+'-', h='<div class="item"><div class="irow"><div class="iname">Resultat</div><div class="hint">'+esc(b.format||'')+'</div></div><div class="log">';
   if(b.metric==='time') h+='<label class="f wide">Tid (fx 12:34)<input id="'+id+'s" value="'+esc(val(id+'s',e.score||''))+'"></label>';
-  else h+='<label class="f">Runder<input id="'+id+'d" inputmode="numeric" value="'+esc(val(id+'d',e.rounds!=null?e.rounds:''))+'"></label>'
+  else h+='<label class="f wide">Samlet tid (valgfri, fx 37:07)<input id="'+id+'t" value="'+esc(val(id+'t',e.time||''))+'"></label>'
+    +'<label class="f">Runder<input id="'+id+'d" inputmode="numeric" value="'+esc(val(id+'d',e.rounds!=null?e.rounds:''))+'"></label>'
     +'<label class="f">+ reps<input id="'+id+'e" inputmode="numeric" value="'+esc(val(id+'e',e.extra!=null?e.extra:''))+'"></label>'
     +'<label class="f wide">Andet resultat (valgfrit, fx kalorier eller meter)<input id="'+id+'s" value="'+esc(val(id+'s',e.rounds!=null?'':(e.score||'')))+'"></label>';
   h+='<label class="f">Rx eller skaleret<select id="'+id+'x">'+Object.keys(MCSCALE).map(function(k){return '<option value="'+k+'"'+(val(id+'x',e.scale||'rx')===k?' selected':'')+'>'+esc(MCSCALE[k])+'</option>';}).join('')+'</select></label>'
@@ -1216,10 +1223,12 @@ async function saveLog(){
       if(rounds==null||extra==null){ bad='Runder og reps skal være tal.'; return; }
       score=rounds+'+'+extra;
     }
+    var tt=b.metric==='time'?'':dv(id+'t').trim();
+    if(tt&&parseScore(tt,'time')==null){ bad='Samlet tid skal skrives som fx 37:07.'; return; }
     var nR=roundsOf(w,bi,null), laps=[];
     for(var q=0;q<nR;q++){ var tv=dv(id+'kl'+q).trim(); if(!tv){ laps.push(null); continue; } var pr1=lapParse(tv); if(pr1.bad||pr1.laps.length!==1){ bad='Rundetiderne skal skrives som fx 2:45.'; return; } laps.push(pr1.laps[0]); }
     while(laps.length&&laps[laps.length-1]==null) laps.pop();
-    if(score||nt||rp!=null||laps.length){ items['mc_'+bi]={kind:'metcon',title:b.title||'',score:score,rounds:rounds,extra:extra,scale:dv(id+'x')||'rx',rpe:rp,note:nt,ts:Date.now()}; if(laps.length) items['mc_'+bi].laps=laps; }
+    if(score||nt||rp!=null||laps.length||tt){ items['mc_'+bi]={kind:'metcon',title:b.title||'',score:score,rounds:rounds,extra:extra,scale:dv(id+'x')||'rx',rpe:rp,note:nt,ts:Date.now()}; if(laps.length) items['mc_'+bi].laps=laps; if(tt) items['mc_'+bi].time=tt; }
   });
   if(bad){ toast(bad,true); return; }
   var os=dv('lg-o-score').trim(), orpe=num(dv('lg-o-rpe')), on=dv('lg-o-note').trim();
@@ -1424,6 +1433,7 @@ function detectItem(l){
   }
   return {type:'free',label:l,reps:reps,note:''};
 }
+var NONEX=/^\s*(rest|hvile|pause|(time[ -]?|tids?)?cap\b|open style|score\b|\d+\s*(min|sek|s)\b.*(rest|hvile|pause|cap))/i;
 function parseKondiText(txt){
   var items=[];
   String(txt).split(/\r?\n/).forEach(function(l){
@@ -1432,7 +1442,7 @@ function parseKondiText(txt){
     if(m&&MACH[k]) items.push({type:'machine',machine:k,label:m[2]||MACH[k],note:''});
     else if(l.charAt(0)==='#') items.push({type:'other',text:l.replace(/^#+\s*/,''),head:true});
     else if(l.charAt(0)==='~') items.push({type:'other',text:l.replace(/^~\s*/,'')});
-    else if(/^(rest|hvile|pause|\d+\s*(min|sek|s)\b.*(rest|hvile|pause))/i.test(l)) items.push({type:'other',text:l});
+    else if(NONEX.test(l)) items.push({type:'other',text:l});
     else items.push(detectItem(l));
   });
   return items;
