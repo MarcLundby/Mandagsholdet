@@ -721,20 +721,26 @@ function blockHtml(b,w,ath){
   (b.items||[]).forEach(function(it){
     if(it.type==='load') h+=loadItem(it,w,ath);
     else if(it.type==='skill') h+=skillItem(it,ath);
-    else if(it.type==='free') h+='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||'Øvelse')+'</div>'+(it.reps?'<div class="scheme">'+esc(it.reps)+'</div>':'')+'</div></div>'+(it.note?'<div class="hint">'+esc(it.note)+'</div>':'')+'</div>';
+    else if(it.type==='free') h+='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||'Øvelse')+'</div>'+schemeDiv([repsTxt(it)])+'</div></div>'+(it.note?'<div class="hint">'+esc(it.note)+'</div>':'')+'</div>';
     else if(it.type==='machine') h+='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||MACH[it.machine]||'Maskine')+'</div><div class="scheme">'+esc(MACH[it.machine]||'')+' · log cal og/eller meter</div></div></div>'+(it.note?'<div class="hint">'+esc(it.note)+'</div>':'')+'</div>';
     else if(it.head) h+='<div class="item head">'+esc(it.text||'')+'</div>';
     else h+='<div class="item"><div>'+esc(it.text||'')+'</div></div>';
   });
   return h+'</section>';
 }
+function repsTxt(it){
+  var r=it.reps==null?'':String(it.reps).trim(); if(!r) return '';
+  var m=/^\s*(\d+(?:\s*[-–]\s*\d+)?)/.exec(String(it.label||''));
+  return m&&m[1].replace(/\s+/g,'')===r.replace(/\s+/g,'')?'':r;
+}
+function schemeDiv(parts){ var s=parts.filter(Boolean).join(' · '); return s?'<div class="scheme">'+esc(s)+'</div>':''; }
 function loadItem(it,w,ath){
   var def=LOADS[it.move]; if(!def) return '';
   var sc=loadFor(ath,w,it);
-  var scheme=(it.reps!=null&&it.reps!==''?it.reps:'')+(sc.pct!==100?' · '+(it.autoPct&&sc.pct===it.autoPct?'EMOM, ':'')+nf(sc.pct)+' % af din arbejdsvægt':'');
+  var scheme=[repsTxt(it),sc.pct!==100?(it.autoPct&&sc.pct===it.autoPct?'EMOM, ':'')+nf(sc.pct)+' % af din arbejdsvægt':''];
   var right = sc.load!=null ? '<div class="big">'+(it.move==='wpullup'?'+':'')+nf(sc.load)+'<small>'+esc(def.unit)+'</small></div>'
     : '<div class="hint" style="text-align:right">'+(ath?'Vælg selv en vægt.<br>Din første log sætter dit niveau.':'Vælg dit navn')+'</div>';
-  var h='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||def.name)+'</div><div class="scheme">'+esc(scheme)+'</div></div>'+right+'</div>';
+  var h='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||def.name)+'</div>'+schemeDiv(scheme)+'</div>'+right+'</div>';
   if(it.note) h+='<div class="hint">'+esc(it.note)+'</div>';
   if(ath){
     var bits=[];
@@ -751,8 +757,8 @@ function skillItem(it,ath){
   var sk=SKILLS[it.skill]; if(!sk) return '';
   var sc=gymScale(it,ath);
   var rxName=sc.rx!=null?sk.ladder[sc.rx]:null;
-  var h='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||sk.name)+'</div><div class="scheme">'
-    +esc(it.reps!=null?String(it.reps):'')+(rxName?' · Rx: '+esc(rxName):'')+'</div></div>';
+  var h='<div class="item"><div class="irow"><div><div class="iname">'+esc(it.label||sk.name)+'</div>'
+    +schemeDiv([repsTxt(it),rxName?'Rx: '+rxName:''])+'</div>';
   if(ath){
     var chip=sc.kind==='down'?'<span class="chip warn">Skaleret</span>':sc.kind==='above'?'<span class="chip good">Du kan mere</span>':sc.kind==='rx'?'<span class="chip">Rx</span>':'';
     h+='<div class="you">'+chip+'<div class="lvl">'+esc(sk.ladder[sc.level])+'</div></div>';
